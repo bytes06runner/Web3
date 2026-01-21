@@ -4,12 +4,15 @@ import { BattleArena } from './components/BattleArena';
 import { FitnessTracker } from './components/FitnessTracker';
 import { MockContract } from './services/mockContract';
 import { Leaderboard } from './components/Leaderboard';
+import { WalletService } from './services/walletService';
 import { Wallet, Bell } from 'lucide-react';
 import { ToastContainer, type ToastMessage, type ToastType } from './components/ui/Toast';
 
 function App() {
   const [gameState, setGameState] = useState(MockContract.getState());
   const [isDepositing, setIsDepositing] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -30,6 +33,20 @@ function App() {
 
   const refreshGame = () => {
     setGameState(MockContract.getState());
+  };
+
+  // Connect wallet
+  const handleConnectWallet = async () => {
+    try {
+      setIsConnecting(true);
+      const address = await WalletService.connect();
+      setWalletAddress(address);
+      addToast('success', `Wallet connected! ${address.slice(0, 4)}...${address.slice(-4)}`);
+    } catch (error: any) {
+      addToast('error', error.message || 'Failed to connect wallet');
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   useEffect(() => {
@@ -76,9 +93,18 @@ function App() {
               <Bell size={20} />
               {gameState.history.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>}
             </button>
-            <button className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/10 px-4 py-2 rounded-full transition-all text-sm text-white font-medium">
+            <button 
+              onClick={handleConnectWallet}
+              disabled={isConnecting}
+              className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/10 px-4 py-2 rounded-full transition-all text-sm text-white font-medium disabled:opacity-50"
+            >
               <Wallet size={16} />
-              {gameState.principal > 0 ? '0xUser...Wallet' : 'Connect Wallet'}
+              {walletAddress 
+                ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`
+                : gameState.principal > 0 
+                  ? '0xUser...Wallet' 
+                  : 'Connect Freighter'
+              }
             </button>
           </div>
         </div>
@@ -90,14 +116,29 @@ function App() {
         {gameState.principal === 0 && (
           <div className="glass-panel p-8 rounded-2xl text-center">
             <h2 className="text-3xl font-bold text-white mb-4">Your Fortress Awaits</h2>
-            <p className="text-gray-400 mb-8 max-w-lg mx-auto">Deposit USDC to start generating yield and Command Tokens. Walk to boost your defenses.</p>
-            <button
-              onClick={handleDeposit}
-              disabled={isDepositing}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg shadow-purple-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-            >
-              {isDepositing ? 'Deploying Vault...' : 'Deposit $100 USDC'}
-            </button>
+            <p className="text-gray-400 mb-8 max-w-lg mx-auto">
+              {walletAddress 
+                ? 'Deposit USDC to start generating yield and Command Tokens'
+                : 'Connect your Freighter wallet to start playing on Stellar blockchain'
+              }
+            </p>
+            {!walletAddress ? (
+              <button
+                onClick={handleConnectWallet}
+                disabled={isConnecting}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg shadow-purple-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+              >
+                {isConnecting ? 'Connecting...' : 'Connect Freighter Wallet'}
+              </button>
+            ) : (
+              <button
+                onClick={handleDeposit}
+                disabled={isDepositing}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg shadow-purple-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+              >
+                {isDepositing ? 'Deploying Vault...' : 'Deposit $100 USDC (Demo)'}
+              </button>
+            )}
           </div>
         )}
 

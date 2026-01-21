@@ -1,0 +1,1 @@
+D:\web3\Web3\contracts\target\wasm32-unknown-unknown\release\yield_raiders_contracts.wasm: D:\web3\Web3\contracts\src\battle.rs D:\web3\Web3\contracts\src\fitness.rs D:\web3\Web3\contracts\src\lib.rs D:\web3\Web3\contracts\src\vault.rs
