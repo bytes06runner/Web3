@@ -3,11 +3,30 @@ import { Dashboard } from './components/Dashboard';
 import { BattleArena } from './components/BattleArena';
 import { FitnessTracker } from './components/FitnessTracker';
 import { MockContract } from './services/mockContract';
+import { Leaderboard } from './components/Leaderboard';
 import { Wallet, Bell } from 'lucide-react';
+import { ToastContainer, type ToastMessage, type ToastType } from './components/ui/Toast';
 
 function App() {
   const [gameState, setGameState] = useState(MockContract.getState());
   const [isDepositing, setIsDepositing] = useState(false);
+
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const addToast = (type: ToastType, message: string) => {
+    const id = Math.random().toString(36).substring(7);
+    setToasts(prev => {
+      const newToasts = [...prev, { id, type, message }];
+      if (newToasts.length > 3) {
+        return newToasts.slice(newToasts.length - 3);
+      }
+      return newToasts;
+    });
+  };
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
 
   const refreshGame = () => {
     setGameState(MockContract.getState());
@@ -19,8 +38,14 @@ function App() {
 
     // Poll for yield updates every 5 seconds
     const interval = setInterval(() => {
-      MockContract.claimYield();
-      refreshGame();
+      const oldYield = gameState.yieldEarned;
+      const newState = MockContract.claimYield();
+      setGameState(newState);
+
+      // Toast on significant yield
+      if (newState.yieldEarned > oldYield + 0.01) {
+        addToast('success', `Yield Claimed! +${(newState.yieldEarned - oldYield).toFixed(4)} USDC`);
+      }
     }, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -31,11 +56,14 @@ function App() {
       MockContract.deposit(100);
       refreshGame();
       setIsDepositing(false);
+      addToast('success', 'Deposit Successful! +$100 USDC');
     }, 1000);
   };
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-20 relative">
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+
       {/* Header */}
       <nav className="border-b border-white/5 bg-black/20 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -80,23 +108,39 @@ function App() {
               commandTokens={gameState.commandTokens}
               yieldEarned={gameState.yieldEarned}
               defense={gameState.defense}
+              stamina={gameState.stamina}
+              streakDays={gameState.streakDays}
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <BattleArena refreshGame={refreshGame} />
-              <FitnessTracker refreshGame={refreshGame} currentSteps={gameState.stepCount} />
+              <BattleArena
+                refreshGame={refreshGame}
+                onToast={(type: ToastType, msg: string) => addToast(type, msg)}
+              />
+              <FitnessTracker
+                refreshGame={refreshGame}
+                currentSteps={gameState.stepCount}
+                onToast={(type: ToastType, msg: string) => addToast(type, msg)}
+              />
             </div>
 
-            {/* Activity Feed */}
-            <div className="glass-panel p-6 rounded-2xl">
-              <h3 className="text-lg font-semibold text-white mb-4">Activity Log</h3>
-              <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                {gameState.history.map((log, i) => (
-                  <div key={i} className="text-sm text-gray-400 border-b border-white/5 pb-2 last:border-0">
-                    {log}
-                  </div>
-                ))}
+            {/* Activity Feed & Leaderboard */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="glass-panel p-6 rounded-2xl h-full">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white">Activity Log</h3>
+                  <span className="text-xs text-gray-500">Real-time updates</span>
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                  {gameState.history.map((log, i) => (
+                    <div key={i} className="text-sm text-gray-400 border-b border-white/5 pb-2 last:border-0 animate-in fade-in slide-in-from-left-2">
+                      {log}
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              <Leaderboard />
             </div>
           </>
         )}

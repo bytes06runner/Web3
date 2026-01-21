@@ -16,6 +16,7 @@ pub struct YieldRaiders;
 pub enum DataKey {
     Vault(Address),
     Fitness(Address),
+    Training(Address), // Track user training status
     TotalYield, // Track protocol revenue
 }
 
@@ -25,6 +26,40 @@ const COMMAND_PER_YIELD: i128 = 10; // 10 Command tokens per 1 USDC yield
 
 #[contractimpl]
 impl YieldRaiders {
+    // ... (Existing Vault & Yield code remains, omitted for brevity if using replace_chunk, but since we are doing logic add, see chunks below) ...
+    // Note: I will use a separate replace call for adding functions to avoid messing up the whole file structure if not needed.
+    // Ideally I should append functions.
+
+    // --- TRAINING ---
+
+    pub fn request_drill(env: Env, user: Address) -> u64 {
+        user.require_auth();
+        // In real app: Check cooldown in storage
+        // Generate pseudo-random ID
+        let drill_id = env.ledger().timestamp() % 5; // 5 questions pool
+        
+        // Return drill ID (client maps this to question text)
+        drill_id
+    }
+
+    pub fn submit_drill(env: Env, user: Address, drill_id: u64, correct: bool) {
+        user.require_auth();
+        
+        // Verify answer (simplified: client sends 'correct', in real app we check hash)
+        if !correct {
+            panic!("Incorrect answer! Security breach detected.");
+        }
+
+        let key = DataKey::Vault(user.clone());
+        let mut vault: Vault = env.storage().persistent().get(&key).expect("Vault not found");
+
+        // Reward
+        vault.defense_power += 5;
+        vault.command_balance += 50; 
+        
+        env.storage().persistent().set(&key, &vault);
+    }
+    
     // --- VAULT & YIELD ---
 
     pub fn deposit(env: Env, user: Address, amount: i128) {
@@ -38,10 +73,12 @@ impl YieldRaiders {
             last_yield_time: env.ledger().timestamp(),
             defense_power: 100, // Base defense
             total_steps: 0,
+            stamina: 100,
         });
 
         // Claim pending yield before depositing
-        let pending_yield = Self::calculate_yield(&env, &vault);
+        // Note: In real app we'd fetch streak here too, assuming 0 for deposit for simplicity or fetching
+        let pending_yield = Self::calculate_yield(&env, &vault, 0);
         vault.command_balance += pending_yield * COMMAND_PER_YIELD;
         
         vault.principal += amount;
@@ -55,10 +92,28 @@ impl YieldRaiders {
         let key = DataKey::Vault(user.clone());
         let mut vault: Vault = env.storage().persistent().get(&key).expect("Vault not found");
 
-        let pending_yield = Self::calculate_yield(&env, &vault);
+        // Fetch fitness stats for streak bonus
+        let fitness_key = DataKey::Fitness(user.clone());
+        let stats = env.storage().persistent().get::<DataKey, FitnessStats>(&fitness_key).unwrap_or(FitnessStats {
+            user: user.clone(),
+            steps_today: 0,
+            last_step_update: 0,
+            streak_days: 0,
+        });
+
+        let pending_yield = Self::calculate_yield(&env, &vault, stats.streak_days);
         let command_earned = pending_yield * COMMAND_PER_YIELD;
         
         vault.command_balance += command_earned;
+
+        // Stamina Regen: 1 per 10 mins (approx 144 per day)
+        // usage: (now - last_time) / 600
+        let time_diff = env.ledger().timestamp() - vault.last_yield_time;
+        let regen = (time_diff / 600) as u32;
+        if regen > 0 {
+             vault.stamina = core::cmp::min(100, vault.stamina + regen);
+        }
+
         vault.last_yield_time = env.ledger().timestamp();
         
         env.storage().persistent().set(&key, &vault);
@@ -70,14 +125,20 @@ impl YieldRaiders {
         env.storage().persistent().get(&DataKey::Vault(user))
     }
 
-    fn calculate_yield(env: &Env, vault: &Vault) -> i128 {
+    fn calculate_yield(env: &Env, vault: &Vault, streak_days: u32) -> i128 {
         let time_diff = env.ledger().timestamp() - vault.last_yield_time;
         if time_diff < SECONDS_PER_DAY {
             return 0; // Simplify: daily yield only
         }
         let days = (time_diff / SECONDS_PER_DAY) as i128;
-        // Simple interest for game mechanics: Principal * Rate * Days
-        (vault.principal * YIELD_RATE_BPS * days) / 10000
+        
+        // Base Rate + Streak Bonus (0.01% per streak day, max 10 days = 0.1%)
+        // YIELD_RATE_BPS is 5 (0.05%). Let's add bonus.
+        // Bonus BPS = min(streak, 10) * 10 (10 bps = 0.1%)
+        let bonus_bps = (core::cmp::min(streak_days, 10) * 10) as i128;
+        let total_rate = YIELD_RATE_BPS + bonus_bps;
+
+        (vault.principal * total_rate * days) / 10000
     }
 
     // --- FITNESS ---
@@ -92,11 +153,19 @@ impl YieldRaiders {
             user: user.clone(),
             steps_today: 0,
             last_step_update: env.ledger().timestamp(),
+            streak_days: 0,
         });
 
         // Reset if new day (simplified)
         let time_diff = env.ledger().timestamp() - stats.last_step_update;
         if time_diff > SECONDS_PER_DAY {
+             // If strictly consecutive (within 48h?), keep streak, else reset
+             // Simplified: Always increment if > 1000 steps and it's a new day
+             if stats.steps_today >= 1000 {
+                 stats.streak_days += 1;
+             } else if time_diff > SECONDS_PER_DAY * 2 {
+                 stats.streak_days = 0; // Lost streak
+             }
             stats.steps_today = 0;
         }
 
@@ -130,11 +199,18 @@ impl YieldRaiders {
         let mut defender_vault: Vault = env.storage().persistent().get(&defender_key).expect("Defender has no vault");
 
         // Raid Cost
-        let raid_cost = 10;
-        if attacker_vault.command_balance < raid_cost {
+        let raid_cost_cmd = 10;
+        let raid_cost_stamina = 20;
+
+        if attacker_vault.command_balance < raid_cost_cmd {
             panic!("Not enough Command tokens");
         }
-        attacker_vault.command_balance -= raid_cost;
+        if attacker_vault.stamina < raid_cost_stamina {
+            panic!("Not enough Stamina");
+        }
+
+        attacker_vault.command_balance -= raid_cost_cmd;
+        attacker_vault.stamina -= raid_cost_stamina;
 
         // Battle Logic: Simple comparison plus RNG simulated by time
         // Power = Base Defense + (Steps / 100)

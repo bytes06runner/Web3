@@ -1,75 +1,91 @@
 import { useState } from 'react';
-import { Heart, Flame } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import { MockContract } from '../services/mockContract';
 
 interface FitnessTrackerProps {
     refreshGame: () => void;
     currentSteps: number;
+    onToast?: (type: 'success' | 'error', msg: string) => void;
 }
 
-export function FitnessTracker({ refreshGame, currentSteps }: FitnessTrackerProps) {
-    const [mockSteps, setMockSteps] = useState('1000');
+export function FitnessTracker({ refreshGame, onToast }: FitnessTrackerProps) {
+    const [drill, setDrill] = useState<any>(null);
     const [submitting, setSubmitting] = useState(false);
 
-    const handleSubmitSteps = () => {
+    const handleRequestDrill = () => {
         setSubmitting(true);
         setTimeout(() => {
-            const steps = parseInt(mockSteps);
-            if (!isNaN(steps) && steps > 0) {
-                MockContract.recordSteps(steps);
-                refreshGame();
-            }
+            const q = MockContract.requestDrill();
+            setDrill(q);
             setSubmitting(false);
-        }, 800);
+            onToast?.('success', 'Drill Request Sent (Tx Confirmed)');
+        }, 1000);
     };
 
-    const progress = Math.min((currentSteps / 10000) * 100, 100);
+    const handleSubmitAnswer = (ans: string) => {
+        setSubmitting(true);
+        setTimeout(() => {
+            const correct = ans === drill.ans;
+            MockContract.submitDrill(correct);
+            refreshGame();
+
+            if (correct) {
+                onToast?.('success', 'Tactical Analysis Correct! +Defense');
+            } else {
+                onToast?.('error', 'Analysis Failed. -Stamina Penalty');
+            }
+
+            setDrill(null);
+            setSubmitting(false);
+        }, 1000);
+    };
 
     return (
         <div className="glass-panel p-6 rounded-2xl">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Heart className="text-pink-500" /> Fitness Force
+                    <Heart className="text-pink-500" /> Tactical Training
                 </h3>
             </div>
 
-            {/* Progress Bar */}
-            <div className="mb-6">
-                <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-400">Daily Goal</span>
-                    <span className="text-white font-mono">{currentSteps} / 10,000</span>
-                </div>
-                <div className="h-4 bg-gray-800 rounded-full overflow-hidden border border-white/5">
-                    <div
-                        className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-1000"
-                        style={{ width: `${progress}%` }}
-                    />
-                </div>
-                <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
-                    <Flame size={12} className="text-orange-500" />
-                    Bonus Active: +{Math.floor(currentSteps / 1000)} CMD Tokens earned
-                </div>
+            {/* Drill Interface */}
+            <div className="bg-white/5 p-4 rounded-xl border border-white/5 min-h-[160px] flex flex-col justify-center">
+                {!drill ? (
+                    <div className="text-center">
+                        <p className="text-gray-400 mb-4 text-sm">Request a tactical assessment from HQ to improve defense parameters.</p>
+                        <button
+                            onClick={handleRequestDrill}
+                            disabled={submitting}
+                            className="bg-pink-600 hover:bg-pink-500 text-white px-6 py-3 rounded-lg font-bold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                        >
+                            {submitting ? 'Requesting...' : 'Request Drill (Tx)'}
+                        </button>
+                    </div>
+                ) : (
+                    <div className="animate-in fade-in zoom-in-95">
+                        <div className="flex justify-between items-center mb-3">
+                            <span className="text-xs text-pink-400 uppercase tracking-widest font-bold">Priority Message</span>
+                            {submitting && <span className="text-xs text-gray-500 animate-pulse">Verifying...</span>}
+                        </div>
+                        <h4 className="text-white font-medium mb-4">{drill.q}</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                            {drill.options.map((opt: string) => (
+                                <button
+                                    key={opt}
+                                    onClick={() => handleSubmitAnswer(opt)}
+                                    disabled={submitting}
+                                    className="bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm py-2 px-3 rounded-lg transition-colors text-left border border-white/5 hover:border-pink-500/50"
+                                >
+                                    {opt}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Input for demo */}
-            <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-                <label className="text-xs text-gray-400 mb-2 block uppercase tracking-wide">Sync Walking Data (Demo)</label>
-                <div className="flex gap-2">
-                    <input
-                        type="number"
-                        value={mockSteps}
-                        onChange={(e) => setMockSteps(e.target.value)}
-                        className="bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white w-full focus:outline-none focus:border-pink-500 transition-colors"
-                        placeholder="Steps to add..."
-                    />
-                    <button
-                        onClick={handleSubmitSteps}
-                        disabled={submitting}
-                        className="bg-pink-600 hover:bg-pink-500 text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:opacity-50"
-                    >
-                        {submitting ? 'Syncing...' : 'Sync'}
-                    </button>
-                </div>
+            <div className="mt-4 text-xs text-center text-gray-600">
+                Warning: Incorrect answers deplete Stamina (-5).
             </div>
         </div>
     );

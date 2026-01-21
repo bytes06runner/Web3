@@ -6,6 +6,7 @@ pub struct FitnessStats {
     pub user: Address,
     pub steps_today: u32,
     pub last_step_update: u64,
+    pub streak_days: u32,
 }
 
 // Logic will be in the main contract impl, this file holds types.

@@ -1,4 +1,4 @@
-import { Shield, Coins, TrendingUp, Activity } from 'lucide-react';
+import { Shield, TrendingUp, Activity, Flame } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
 interface DashboardProps {
@@ -6,10 +6,12 @@ interface DashboardProps {
     commandTokens: number;
     yieldEarned: number;
     defense: number;
+    stamina: number;
+    streakDays: number;
     className?: string;
 }
 
-export function Dashboard({ principal, commandTokens, yieldEarned, defense, className }: DashboardProps) {
+export function Dashboard({ principal, defense, stamina, streakDays, className }: DashboardProps) {
     return (
         <div className={twMerge("grid grid-cols-1 md:grid-cols-2 gap-4", className)}>
             {/* Main Stats Card */}
@@ -27,21 +29,26 @@ export function Dashboard({ principal, commandTokens, yieldEarned, defense, clas
                 <div className="grid grid-cols-3 gap-4 mt-6">
                     <div className="bg-white/5 p-3 rounded-xl border border-white/5">
                         <div className="text-gray-400 text-xs mb-1 flex items-center gap-1">
-                            <Coins size={12} /> Yield Earned
+                            <Activity size={12} /> Stamina
                         </div>
-                        <div className="text-xl font-semibold text-green-300">${yieldEarned.toFixed(4)}</div>
-                    </div>
-                    <div className="bg-white/5 p-3 rounded-xl border border-white/5">
-                        <div className="text-gray-400 text-xs mb-1 flex items-center gap-1">
-                            <Activity size={12} /> Command
+                        <div className="w-full bg-gray-700 h-1.5 rounded-full mb-1 overflow-hidden">
+                            <div className="bg-amber-400 h-full rounded-full transition-all duration-500" style={{ width: `${stamina}%` }}></div>
                         </div>
-                        <div className="text-xl font-semibold text-blue-300 neon-text">{Math.floor(commandTokens)} CMD</div>
+                        <div className="text-sm font-semibold text-amber-300">{Math.floor(stamina)}/100</div>
                     </div>
                     <div className="bg-white/5 p-3 rounded-xl border border-white/5">
                         <div className="text-gray-400 text-xs mb-1 flex items-center gap-1">
                             <Shield size={12} /> Defense
                         </div>
                         <div className="text-xl font-semibold text-purple-300">{defense}</div>
+                    </div>
+                    <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                        <div className="text-gray-400 text-xs mb-1 flex items-center gap-1">
+                            <Flame size={12} className="text-orange-500" /> Streak
+                        </div>
+                        <div className="text-xl font-semibold text-white flex items-center gap-1">
+                            {streakDays} <span className="text-xs text-gray-400 font-normal">days</span>
+                        </div>
                     </div>
                 </div>
             </div>

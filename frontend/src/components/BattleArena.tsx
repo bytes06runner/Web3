@@ -4,6 +4,7 @@ import { MockContract } from '../services/mockContract';
 
 interface BattleArenaProps {
     refreshGame: () => void;
+    onToast?: (type: 'success' | 'error', msg: string) => void;
 }
 
 const MOCK_OPPONENTS = [
@@ -12,7 +13,7 @@ const MOCK_OPPONENTS = [
     { name: 'Degen_King', defense: 200, yield: 5000, risk: 'High' },
 ];
 
-export function BattleArena({ refreshGame }: BattleArenaProps) {
+export function BattleArena({ refreshGame, onToast }: BattleArenaProps) {
     const [attacking, setAttacking] = useState<string | null>(null);
 
     const handleRaid = async (target: string) => {
@@ -20,10 +21,22 @@ export function BattleArena({ refreshGame }: BattleArenaProps) {
         // Simulate network delay
         setTimeout(() => {
             try {
-                MockContract.raid(target);
+                const result = MockContract.raid(target);
                 refreshGame(); // Update parent state
+
+                // Check history for result to determine toast type (simplified check)
+                // In reality, raid should return result struct. For now, assume if no error thrown, it went through.
+                // We'll peek at the latest history log or return value.
+                // MockContract.raid returns state.
+                const lastLog = result.history[0] || "";
+                if (lastLog.includes("SUCCESSFUL")) {
+                    onToast?.('success', `Raid Successful! +Loot`);
+                } else {
+                    onToast?.('error', `Raid Failed. Lost Command Tokens.`);
+                }
+
             } catch (e: any) {
-                alert(e.message);
+                onToast?.('error', e.message);
             } finally {
                 setAttacking(null);
             }
@@ -61,7 +74,7 @@ export function BattleArena({ refreshGame }: BattleArenaProps) {
                             disabled={!!attacking}
                             className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
-                            {attacking === opp.name ? 'Raiding...' : 'RAID (10 CMD)'}
+                            {attacking === opp.name ? 'Raiding...' : 'RAID (10 CMD + 20 STM)'}
                         </button>
                     </div>
                 ))}

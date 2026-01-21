@@ -36,6 +36,24 @@
   }
 }
 
+@theme {
+  --animate-progress: progress 2s ease-in-out infinite;
+
+  @keyframes progress {
+    0% {
+      width: 0%
+    }
+
+    50% {
+      width: 100%
+    }
+
+    100% {
+      width: 0%
+    }
+  }
+}
+
 body {
   @apply bg-background text-foreground antialiased;
   background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 100%);

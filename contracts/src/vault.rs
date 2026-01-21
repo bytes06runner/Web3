@@ -9,6 +9,7 @@ pub struct Vault {
     pub last_yield_time: u64,   // Timestamp of last yield claim
     pub defense_power: u32,     // Base defense
     pub total_steps: u32,       // Integrated fitness stat
+    pub stamina: u32,           // Actions resource
 }
 
 // In a real app we'd map Address -> Vault
