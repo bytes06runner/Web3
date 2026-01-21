@@ -237,3 +237,6 @@ impl YieldRaiders {
         outcome
     }
 }
+
+
+// $env:Path += ";$env:USERPROFILE\.cargo\bin"; stellar contract deploy --wasm target/wasm32-unknown-unknown/release/yield_raiders_contracts.wasm --source mykey --network testnet
