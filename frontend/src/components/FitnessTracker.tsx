@@ -6,38 +6,54 @@ interface FitnessTrackerProps {
     refreshGame: () => void;
     currentSteps: number;
     onToast?: (type: 'success' | 'error', msg: string) => void;
+    walletAddress: string | null;
 }
 
-export function FitnessTracker({ refreshGame, onToast }: FitnessTrackerProps) {
+export function FitnessTracker({ refreshGame, onToast, walletAddress }: FitnessTrackerProps) {
     const [drill, setDrill] = useState<any>(null);
     const [submitting, setSubmitting] = useState(false);
 
-    const handleRequestDrill = () => {
+    const handleRequestDrill = async () => {
+        if (!walletAddress) {
+             onToast?.('error', 'Connect Wallet to Train');
+             return;
+        }
+
         setSubmitting(true);
-        setTimeout(() => {
-            const q = MockContract.requestDrill();
+        try {
+            // Requires signing 10 XLM payment
+            const q = await MockContract.requestDrill(walletAddress);
             setDrill(q);
+            refreshGame(); // update history
+            onToast?.('success', 'Drill Started! 10 XLM Staked.');
+        } catch(e: any) {
+            onToast?.('error', e.message);
+        } finally {
             setSubmitting(false);
-            onToast?.('success', 'Drill Request Sent (Tx Confirmed)');
-        }, 1000);
+        }
     };
 
-    const handleSubmitAnswer = (ans: string) => {
+    const handleSubmitAnswer = async (ans: string) => {
+        if (!walletAddress) return;
+
         setSubmitting(true);
-        setTimeout(() => {
+        try {
             const correct = ans === drill.ans;
-            MockContract.submitDrill(correct);
+            // Requires signing if Wrong (another 10 XLM)
+            await MockContract.submitDrill(correct, walletAddress);
             refreshGame();
 
             if (correct) {
-                onToast?.('success', 'Tactical Analysis Correct! +Defense');
+                onToast?.('success', 'Correct! Payout Pending (15 XLM)');
             } else {
-                onToast?.('error', 'Analysis Failed. -Stamina Penalty');
+                onToast?.('error', 'Wrong! +10 XLM Penalty Paid.');
             }
-
             setDrill(null);
+        } catch(e: any) {
+            onToast?.('error', e.message);
+        } finally {
             setSubmitting(false);
-        }, 1000);
+        }
     };
 
     return (
@@ -52,13 +68,13 @@ export function FitnessTracker({ refreshGame, onToast }: FitnessTrackerProps) {
             <div className="bg-white/5 p-4 rounded-xl border border-white/5 min-h-[160px] flex flex-col justify-center">
                 {!drill ? (
                     <div className="text-center">
-                        <p className="text-gray-400 mb-4 text-sm">Request a tactical assessment from HQ to improve defense parameters.</p>
+                        <p className="text-gray-400 mb-4 text-sm">Request a tactical assessment. <strong>Stake 10 XLM.</strong> Win 15 XLM back.</p>
                         <button
                             onClick={handleRequestDrill}
                             disabled={submitting}
                             className="bg-pink-600 hover:bg-pink-500 text-white px-6 py-3 rounded-lg font-bold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                         >
-                            {submitting ? 'Requesting...' : 'Request Drill (Tx)'}
+                            {submitting ? 'Requesting...' : 'Request Drill (Tx 10 XLM)'}
                         </button>
                     </div>
                 ) : (
@@ -85,7 +101,7 @@ export function FitnessTracker({ refreshGame, onToast }: FitnessTrackerProps) {
             </div>
 
             <div className="mt-4 text-xs text-center text-gray-600">
-                Warning: Incorrect answers deplete Stamina (-5).
+                Warning: Incorrect answers deplete Stamina and incur another <strong>10 XLM</strong> penalty.
             </div>
         </div>
     );

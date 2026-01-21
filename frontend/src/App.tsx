@@ -5,13 +5,16 @@ import { FitnessTracker } from './components/FitnessTracker';
 import { MockContract } from './services/mockContract';
 import { Leaderboard } from './components/Leaderboard';
 import { WalletService } from './services/walletService';
+import { StellarService } from './services/stellarService';
 import { Wallet, Bell } from 'lucide-react';
 import { ToastContainer, type ToastMessage, type ToastType } from './components/ui/Toast';
 
 function App() {
   const [gameState, setGameState] = useState(MockContract.getState());
   const [isDepositing, setIsDepositing] = useState(false);
+  
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [xlmBalance, setXlmBalance] = useState<string>('0');
   const [isConnecting, setIsConnecting] = useState(false);
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -41,6 +44,18 @@ function App() {
       setIsConnecting(true);
       const address = await WalletService.connect();
       setWalletAddress(address);
+      
+      // Fetch real balance
+      const balance = await StellarService.getBalance(address);
+      setXlmBalance(balance);
+      
+      // Update Game State to reflect Wallet Balance as TVL
+      const numericBalance = parseFloat(balance);
+      if (!isNaN(numericBalance)) {
+          MockContract.setPrincipal(numericBalance);
+          setGameState(MockContract.getState());
+      }
+
       addToast('success', `Wallet connected! ${address.slice(0, 4)}...${address.slice(-4)}`);
     } catch (error: any) {
       addToast('error', error.message || 'Failed to connect wallet');
@@ -73,7 +88,7 @@ function App() {
       MockContract.deposit(100);
       refreshGame();
       setIsDepositing(false);
-      addToast('success', 'Deposit Successful! +$100 USDC');
+      addToast('success', 'Deposit Successful! + USDC');
     }, 1000);
   };
 
@@ -118,7 +133,7 @@ function App() {
             <h2 className="text-3xl font-bold text-white mb-4">Your Fortress Awaits</h2>
             <p className="text-gray-400 mb-8 max-w-lg mx-auto">
               {walletAddress 
-                ? 'Deposit USDC to start generating yield and Command Tokens'
+                ? `Connected: ${xlmBalance} XLM available. Deposit USDC to start.`
                 : 'Connect your Freighter wallet to start playing on Stellar blockchain'
               }
             </p>
@@ -136,7 +151,7 @@ function App() {
                 disabled={isDepositing}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg shadow-purple-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
               >
-                {isDepositing ? 'Deploying Vault...' : 'Deposit $100 USDC (Demo)'}
+                {isDepositing ? 'Deploying Vault...' : 'Deposit  USDC (Demo)'}
               </button>
             )}
           </div>
@@ -144,6 +159,11 @@ function App() {
 
         {gameState.principal > 0 && (
           <>
+            <div className="bg-slate-800/50 p-4 rounded-lg mb-6 flex justify-between items-center">
+               <span className="text-gray-300">Stellar Balance:</span>
+               <span className="text-xl font-mono text-yellow-400">{xlmBalance} XLM</span>
+            </div>
+
             <Dashboard
               principal={gameState.principal}
               commandTokens={gameState.commandTokens}
@@ -153,21 +173,27 @@ function App() {
               streakDays={gameState.streakDays}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <BattleArena
-                refreshGame={refreshGame}
-                onToast={(type: ToastType, msg: string) => addToast(type, msg)}
-              />
-              <FitnessTracker
-                refreshGame={refreshGame}
-                currentSteps={gameState.stepCount}
-                onToast={(type: ToastType, msg: string) => addToast(type, msg)}
-              />
+            <div className="flex flex-col md:flex-row gap-8">
+              <div className="flex-1">
+                <BattleArena
+                    refreshGame={refreshGame}
+                    onToast={(type: ToastType, msg: string) => addToast(type, msg)}
+                    walletAddress={walletAddress}
+                />
+              </div>
+              <div className="flex-1">
+                <FitnessTracker
+                    refreshGame={refreshGame}
+                    currentSteps={gameState.stepCount}
+                    onToast={(type: ToastType, msg: string) => addToast(type, msg)}
+                    walletAddress={walletAddress}
+                />
+              </div>
             </div>
 
             {/* Activity Feed & Leaderboard */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="glass-panel p-6 rounded-2xl h-full">
+            <div className="flex flex-col md:flex-row gap-8">
+              <div className="flex-1 glass-panel p-6 rounded-2xl h-full">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-white">Activity Log</h3>
                   <span className="text-xs text-gray-500">Real-time updates</span>
@@ -181,7 +207,9 @@ function App() {
                 </div>
               </div>
 
-              <Leaderboard />
+              <div className="flex-1">
+                 <Leaderboard />
+              </div>
             </div>
           </>
         )}

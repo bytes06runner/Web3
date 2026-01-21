@@ -5,6 +5,7 @@ import { MockContract } from '../services/mockContract';
 interface BattleArenaProps {
     refreshGame: () => void;
     onToast?: (type: 'success' | 'error', msg: string) => void;
+    walletAddress: string | null;
 }
 
 const MOCK_OPPONENTS = [
@@ -13,34 +14,33 @@ const MOCK_OPPONENTS = [
     { name: 'Degen_King', defense: 200, yield: 5000, risk: 'High' },
 ];
 
-export function BattleArena({ refreshGame, onToast }: BattleArenaProps) {
+export function BattleArena({ refreshGame, onToast, walletAddress }: BattleArenaProps) {
     const [attacking, setAttacking] = useState<string | null>(null);
 
     const handleRaid = async (target: string) => {
+        if (!walletAddress) {
+            onToast?.('error', 'Connect Wallet to Raid');
+            return;
+        }
+
         setAttacking(target);
-        // Simulate network delay
-        setTimeout(() => {
-            try {
-                const result = MockContract.raid(target);
-                refreshGame(); // Update parent state
+        
+        try {
+            // Updated raid involves tx signing which takes time
+            const result = await MockContract.raid(target, walletAddress);
+            refreshGame(); 
 
-                // Check history for result to determine toast type (simplified check)
-                // In reality, raid should return result struct. For now, assume if no error thrown, it went through.
-                // We'll peek at the latest history log or return value.
-                // MockContract.raid returns state.
-                const lastLog = result.history[0] || "";
-                if (lastLog.includes("SUCCESSFUL")) {
-                    onToast?.('success', `Raid Successful! +Loot`);
-                } else {
-                    onToast?.('error', `Raid Failed. Lost Command Tokens.`);
-                }
-
-            } catch (e: any) {
-                onToast?.('error', e.message);
-            } finally {
-                setAttacking(null);
+            if (result.success) {
+                onToast?.('success', `Raid Successful! +${result.reward} XLM`);
+            } else {
+                onToast?.('error', `Raid Failed. Wallet deducted ${result.penalty} XLM.`);
             }
-        }, 1500);
+
+        } catch (e: any) {
+            onToast?.('error', e.message || 'Transaction / Raid Failed');
+        } finally {
+            setAttacking(null);
+        }
     };
 
     return (
