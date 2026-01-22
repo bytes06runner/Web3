@@ -3,7 +3,7 @@
  * Handles passive regeneration and other time-based game mechanics.
  */
 
-// Calculates and updates the user's capacity based on time elapsed and yield rate.
+// Calculates and updates the user's capacity based on time elapsed.
 export function calculateRegen(user) {
     if (user.capacity === undefined || !user.lastCapacityUpdate) {
         user.capacity = user.capacity !== undefined ? user.capacity : 100;
@@ -18,11 +18,9 @@ export function calculateRegen(user) {
 
     if (elapsedSeconds <= 0) return;
 
-    // Yield Logic: Base Rate + Bonus from Wins
-    // Higher wins = Faster regeneration
-    const baseRate = 0.5; // Starts at 0.5 capacity per second (example)
-    const winBonus = (user.stats.wins || 0) * 0.1; 
-    const regenRate = baseRate + winBonus;
+    // Yield Logic: Fixed 1% every 3 seconds
+    // 100% capacity takes 300 seconds (5 minutes)
+    const regenRate = 1 / 3; // 0.3333 capacity per second
 
     const regeneratedAmount = elapsedSeconds * regenRate;
     
@@ -35,7 +33,8 @@ export function calculateRegen(user) {
         newCapacity = maxCap;
     }
 
-    user.capacity = Math.floor(newCapacity); // Keep it integer for simplicity
+    // Keep decimal precision for smooth regen across short polling intervals
+    user.capacity = newCapacity; 
     user.lastCapacityUpdate = now;
 }
 

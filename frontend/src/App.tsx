@@ -93,7 +93,7 @@ function App() {
           if (res.ok) {
               const updatedUser = await res.json();
               setUser(updatedUser);
-              localStorage.setItem('user', JSON.stringify(updatedUser));
+              localStorage.setItem('user', JSON.stringify(updatedUser)); // Persist for reload
           }
       } catch (err) {
           console.error("Failed to refresh user data", err);
@@ -116,10 +116,8 @@ function App() {
       // Refresh User Data (Regen Capacity)
       fetchUserData();
 
-      // Toast on significant yield
-      if (newState.yieldEarned > oldYield + 0.01) {
-        addToast('success', `Yield Claimed! +${(newState.yieldEarned - oldYield).toFixed(4)} USDC`);
-      }
+      // Yield Toast REMOVED as per user request
+      // if (newState.yieldEarned > oldYield + 0.01) { ... }
     }, 5000);
     return () => clearInterval(interval);
   }, [view, fetchUserData]);
