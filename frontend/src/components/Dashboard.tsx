@@ -2,7 +2,8 @@ import { Shield, TrendingUp, Activity, Flame } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
 interface DashboardProps {
-    principal: number;
+    balance: number;
+    capacity: number;
     commandTokens: number;
     yieldEarned: number;
     defense: number;
@@ -11,8 +12,8 @@ interface DashboardProps {
     className?: string;
 }
 
-export function Dashboard({ principal, defense, stamina, streakDays, className }: DashboardProps) {
-    const healthPercent = Math.min((principal / 1000) * 100, 100);
+export function Dashboard({ balance, capacity, defense, stamina, streakDays, className }: DashboardProps) {
+    const healthPercent = Math.min(capacity, 100);
     const powerLevel = defense + (stamina / 2) + (streakDays * 5);
     
     // Power Intensity Glow Color
@@ -33,7 +34,7 @@ export function Dashboard({ principal, defense, stamina, streakDays, className }
                 
                 <h2 className="text-cyan-400 text-xs font-bold tracking-[0.2em] uppercase mb-1">Vault Status // Online</h2>
                 <div className="text-5xl font-bold text-white mb-2 flex items-baseline gap-2 font-mono">
-                    ${principal.toFixed(2)}
+                    ${balance.toFixed(2)}
                     <span className="text-xs font-normal text-green-400 flex items-center gap-1 bg-green-900/20 px-2 py-1 rounded border border-green-900/50">
                         <TrendingUp size={10} /> +5% APY
                     </span>

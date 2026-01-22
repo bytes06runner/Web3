@@ -109,7 +109,7 @@ function App() {
 
     // Poll for updates every 5 seconds
     const interval = setInterval(() => {
-      const oldYield = gameState.yieldEarned;
+      // const oldYield = gameState.yieldEarned;
       const newState = MockContract.claimYield();
       setGameState(newState);
 
@@ -117,7 +117,6 @@ function App() {
       fetchUserData();
 
       // Yield Toast REMOVED as per user request
-      // if (newState.yieldEarned > oldYield + 0.01) { ... }
     }, 5000);
     return () => clearInterval(interval);
   }, [view, fetchUserData]);
