@@ -74,6 +74,8 @@ impl YieldRaiders {
             defense_power: 100, // Base defense
             total_steps: 0,
             stamina: 100,
+            unit_type: 0,
+            last_raid_time: 0,
         });
 
         // Claim pending yield before depositing
@@ -209,10 +211,35 @@ impl YieldRaiders {
             panic!("Not enough Stamina");
         }
 
+        // Cooldown Check (Regen period for defender)
+        let now = env.ledger().timestamp();
+        if now - defender_vault.last_raid_time < 300 { // 5 minutes immunity
+             panic!("Target is under protection shield");
+        }
+
         attacker_vault.command_balance -= raid_cost_cmd;
         attacker_vault.stamina -= raid_cost_stamina;
 
-        // Battle Logic: Simple comparison plus RNG simulated by time
+        // --- BATTLE LOGIC ---
+        
+        // 1. Calculate Unit Advantage (Infantry > Archer > Cavalry > Infantry)
+        // 0=Infantry, 1=Archer, 2=Cavalry
+        // +20% bonus if Advantage
+        let mut unit_bonus_pct = 0;
+        let atk_unit = attacker_vault.unit_type;
+        let def_unit = defender_vault.unit_type;
+        
+        if (atk_unit == 0 && def_unit == 1) || (atk_unit == 1 && def_unit == 2) || (atk_unit == 2 && def_unit == 0) {
+            unit_bonus_pct = 20;
+        }
+
+        // 2. Power Calculation
+        let base_power = attacker_vault.defense_power + (attacker_vault.total_steps / 100);
+        let attack_power = base_power + (base_power * unit_bonus_pct / 100);
+        
+        let defense_power = defender_vault.defense_power + (defender_vault.total_steps / 100);
+        
+        // 3. Pseudo-random factor
         // Power = Base Defense + (Steps / 100)
         let attack_power = attacker_vault.defense_power + (attacker_vault.total_steps / 100);
         let defense_power = defender_vault.defense_power + (defender_vault.total_steps / 100);
@@ -225,10 +252,17 @@ impl YieldRaiders {
             let loot = (defender_vault.command_balance * 20) / 100;
             defender_vault.command_balance -= loot;
             attacker_vault.command_balance += loot;
+            
+            // Mark defender for shield
+            defender_vault.last_raid_time = now;
+            
             BattleOutcome::Victory
         } else {
             BattleOutcome::Defeat
         };
+
+        // Update timestamps
+        attacker_vault.last_raid_time = now;
 
         // Save states
         env.storage().persistent().set(&attacker_key, &attacker_vault);

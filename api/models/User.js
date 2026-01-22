@@ -25,6 +25,35 @@ const UserSchema = new mongoose.Schema({
     stamina: { type: Number, default: 100 },
     streak: { type: Number, default: 0 },
   },
+  unitType: {
+    type: String,
+    enum: ['Infantry', 'Archer', 'Cavalry'],
+    default: 'Infantry'
+  },
+  lastRaidTime: {
+     type: Date,
+     default: null
+  },
+  barracksLevel: {
+    type: Number,
+    default: 1
+  },
+  capacity: {
+    type: Number,
+    default: 100
+  },
+  maxCapacity: {
+    type: Number,
+    default: 100
+  },
+  lastCapacityUpdate: {
+    type: Date,
+    default: Date.now
+  },
+  balance: {
+    type: Number,
+    default: 1000
+  }
 }, { timestamps: true });
 
 export default mongoose.models.User || mongoose.model('User', UserSchema);

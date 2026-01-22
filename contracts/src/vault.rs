@@ -10,6 +10,8 @@ pub struct Vault {
     pub defense_power: u32,     // Base defense
     pub total_steps: u32,       // Integrated fitness stat
     pub stamina: u32,           // Actions resource
+    pub unit_type: u32,         // 0=Infantry, 1=Archer, 2=Cavalry
+    pub last_raid_time: u64,    // Timestamp of last raid participation
 }
 
 // In a real app we'd map Address -> Vault

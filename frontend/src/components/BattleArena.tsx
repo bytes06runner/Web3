@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Sword, Users, Shield, RefreshCw } from 'lucide-react';
 import { MockContract } from '../services/mockContract';
-import { RaidModal } from './RaidModal';
+import { BreachTerminal } from './BreachTerminal';
 
 interface BattleArenaProps {
     refreshGame: () => void;
     onToast?: (type: 'success' | 'error', msg: string) => void;
     walletAddress: string | null;
+    user: any;
 }
 
-export function BattleArena({ refreshGame, onToast, walletAddress }: BattleArenaProps) {
+export function BattleArena({ refreshGame, onToast, walletAddress, user }: BattleArenaProps) {
     const [opponents, setOpponents] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
@@ -144,12 +145,12 @@ export function BattleArena({ refreshGame, onToast, walletAddress }: BattleArena
             </div>
 
             {selectedOpponent && (
-                <RaidModal 
+                <BreachTerminal 
                     isOpen={modalOpen} 
                     onClose={() => setModalOpen(false)}
-                    onSuccess={executeRaid}
-                    opponentName={selectedOpponent.username || 'Unknown'}
-                    opponentDefense={selectedOpponent.stats?.defense || 50}
+                    onBreach={executeRaid}
+                    attackerStats={user?.stats}
+                    opponent={selectedOpponent}
                 />
             )}
         </>

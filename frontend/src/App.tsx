@@ -216,6 +216,7 @@ function App() {
                     refreshGame={refreshGame}
                     onToast={(type: ToastType, msg: string) => addToast(type, msg)}
                     walletAddress={walletAddress}
+                    user={user}
                 />
               </div>
               <div className="flex-1">
