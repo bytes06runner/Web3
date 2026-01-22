@@ -7,17 +7,18 @@ export default async function handler(request, response) {
     await connectToDatabase();
 
     if (request.method === 'GET') {
-        const users = await User.find({}).select('-password').sort({ 'stats.wins': -1 });
-        
-        // Apply passive regeneration to all users before returning
-        users.forEach(user => {
-            calculateRegen(user);
-            // Ideally we should save this state, but for read-heavy endpoint we can just calculate 'view' state
-            // If we want to persist, we'd need to bulkWrite or save individually. 
-            // For hackathon, doing a save on the specific user FE is interested in or just lazily updating is fine.
-            // Let's just return the calculated values. User object is mutable here.
-        });
+        const { walletAddress } = request.query;
 
+        if (walletAddress) {
+            const user = await User.findOne({ walletAddress });
+            if (!user) return response.status(404).json({ message: 'User not found' });
+            
+            calculateRegen(user);
+            // We return the user with regenerated stats
+            return response.status(200).json(user);
+        }
+
+        const users = await User.find({}).select('-password').sort({ 'stats.wins': -1 });
         return response.status(200).json(users);
     }
     

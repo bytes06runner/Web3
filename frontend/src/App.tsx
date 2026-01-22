@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { BattleArena } from './components/BattleArena';
 import { FitnessTracker } from './components/FitnessTracker';
@@ -86,17 +86,35 @@ function App() {
     }
   };
 
+  const fetchUserData = useCallback(async () => {
+      if (!user?.walletAddress) return;
+      try {
+          const res = await fetch(`/api/users?walletAddress=${user.walletAddress}`);
+          if (res.ok) {
+              const updatedUser = await res.json();
+              setUser(updatedUser);
+              localStorage.setItem('user', JSON.stringify(updatedUser));
+          }
+      } catch (err) {
+          console.error("Failed to refresh user data", err);
+      }
+  }, [user?.walletAddress]);
+
   useEffect(() => {
     if (view !== 'game') return;
 
     // Initial load
     refreshGame();
+    fetchUserData();
 
-    // Poll for yield updates every 5 seconds
+    // Poll for updates every 5 seconds
     const interval = setInterval(() => {
       const oldYield = gameState.yieldEarned;
       const newState = MockContract.claimYield();
       setGameState(newState);
+
+      // Refresh User Data (Regen Capacity)
+      fetchUserData();
 
       // Toast on significant yield
       if (newState.yieldEarned > oldYield + 0.01) {
@@ -104,7 +122,7 @@ function App() {
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [view]);
+  }, [view, fetchUserData]);
 
   const handleDeposit = () => {
     setIsDepositing(true);
@@ -127,7 +145,6 @@ function App() {
     <div className="min-h-screen pb-20 relative bg-[#0f172a] text-white">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
-      {/* Header */}
       <nav className="border-b border-white/5 bg-black/20 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -164,7 +181,6 @@ function App() {
 
       <main className="max-w-5xl mx-auto px-4 pt-8 space-y-8">
 
-        {/* Welcome / Deposit Action */}
         {gameState.principal === 0 && (
           <div className="glass-panel p-8 rounded-2xl text-center border border-white/10 bg-white/5 backdrop-blur-md">
             <h2 className="text-3xl font-bold text-white mb-4">Your Fortress Awaits</h2>
@@ -202,10 +218,11 @@ function App() {
             </div>
 
             <Dashboard
-              principal={gameState.principal}
+              balance={user?.balance || gameState.principal}
+              capacity={user?.capacity || 100}
               commandTokens={gameState.commandTokens}
               yieldEarned={gameState.yieldEarned}
-              defense={gameState.defense}
+              defense={user?.stats?.defense || gameState.defense}
               stamina={gameState.stamina}
               streakDays={gameState.streakDays}
             />
@@ -213,7 +230,7 @@ function App() {
             <div className="flex flex-col md:flex-row gap-8">
               <div className="flex-1">
                 <BattleArena
-                    refreshGame={refreshGame}
+                    refreshGame={() => { refreshGame(); fetchUserData(); }}
                     onToast={(type: ToastType, msg: string) => addToast(type, msg)}
                     walletAddress={walletAddress}
                     user={user}
