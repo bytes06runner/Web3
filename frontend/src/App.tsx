@@ -6,10 +6,15 @@ import { MockContract } from './services/mockContract';
 import { Leaderboard } from './components/Leaderboard';
 import { WalletService } from './services/walletService';
 import { StellarService } from './services/stellarService';
-import { Wallet, Bell } from 'lucide-react';
+import { Wallet, Bell, LogOut } from 'lucide-react';
 import { ToastContainer, type ToastMessage, type ToastType } from './components/ui/Toast';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
 
 function App() {
+  const [user, setUser] = useState<any>(null);
+  const [view, setView] = useState<'login' | 'register' | 'game'>('login');
+
   const [gameState, setGameState] = useState(MockContract.getState());
   const [isDepositing, setIsDepositing] = useState(false);
   
@@ -18,6 +23,23 @@ function App() {
   const [isConnecting, setIsConnecting] = useState(false);
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    if (token && storedUser) {
+        setUser(JSON.parse(storedUser));
+        setView('game');
+    }
+  }, []);
+
+  const handleLogout = () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+      setView('login');
+      setWalletAddress(null);
+  };
 
   const addToast = (type: ToastType, message: string) => {
     const id = Math.random().toString(36).substring(7);
@@ -65,6 +87,8 @@ function App() {
   };
 
   useEffect(() => {
+    if (view !== 'game') return;
+
     // Initial load
     refreshGame();
 
@@ -80,7 +104,7 @@ function App() {
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [view]);
 
   const handleDeposit = () => {
     setIsDepositing(true);
@@ -92,8 +116,15 @@ function App() {
     }, 1000);
   };
 
+  if (view === 'login') {
+      return <Login onLoginSuccess={(u) => { setUser(u); setView('game'); }} onSwitchToRegister={() => setView('register')} />;
+  }
+  if (view === 'register') {
+      return <Register onRegisterSuccess={(u) => { setUser(u); setView('game'); }} onSwitchToLogin={() => setView('login')} />;
+  }
+
   return (
-    <div className="min-h-screen pb-20 relative">
+    <div className="min-h-screen pb-20 relative bg-[#0f172a] text-white">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
       {/* Header */}
@@ -104,6 +135,9 @@ function App() {
             <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">Yield Raiders</h1>
           </div>
           <div className="flex items-center gap-4">
+            <span className="text-gray-400 text-sm hidden md:block font-mono">
+                {user?.username ? `CMD ${user.username}` : ''}
+            </span>
             <button className="p-2 text-gray-400 hover:text-white transition-colors relative">
               <Bell size={20} />
               {gameState.history.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>}
@@ -118,8 +152,11 @@ function App() {
                 ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`
                 : gameState.principal > 0 
                   ? '0xUser...Wallet' 
-                  : 'Connect Freighter'
+                  : 'Connect'
               }
+            </button>
+            <button onClick={handleLogout} className="p-2 text-red-500/70 hover:text-red-400 transition-colors" title="Logout">
+                <LogOut size={20} />
             </button>
           </div>
         </div>
@@ -129,7 +166,7 @@ function App() {
 
         {/* Welcome / Deposit Action */}
         {gameState.principal === 0 && (
-          <div className="glass-panel p-8 rounded-2xl text-center">
+          <div className="glass-panel p-8 rounded-2xl text-center border border-white/10 bg-white/5 backdrop-blur-md">
             <h2 className="text-3xl font-bold text-white mb-4">Your Fortress Awaits</h2>
             <p className="text-gray-400 mb-8 max-w-lg mx-auto">
               {walletAddress 
@@ -151,7 +188,7 @@ function App() {
                 disabled={isDepositing}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg shadow-purple-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
               >
-                {isDepositing ? 'Deploying Vault...' : 'Deposit  USDC (Demo)'}
+                {isDepositing ? 'Deploying Vault...' : 'Deposit USDC (Demo)'}
               </button>
             )}
           </div>
@@ -159,7 +196,7 @@ function App() {
 
         {gameState.principal > 0 && (
           <>
-            <div className="bg-slate-800/50 p-4 rounded-lg mb-6 flex justify-between items-center">
+            <div className="bg-slate-800/50 p-4 rounded-lg mb-6 flex justify-between items-center border border-white/5">
                <span className="text-gray-300">Stellar Balance:</span>
                <span className="text-xl font-mono text-yellow-400">{xlmBalance} XLM</span>
             </div>
@@ -193,7 +230,7 @@ function App() {
 
             {/* Activity Feed & Leaderboard */}
             <div className="flex flex-col md:flex-row gap-8">
-              <div className="flex-1 glass-panel p-6 rounded-2xl h-full">
+              <div className="flex-1 glass-panel p-6 rounded-2xl h-full border border-white/10 bg-white/5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-white">Activity Log</h3>
                   <span className="text-xs text-gray-500">Real-time updates</span>
