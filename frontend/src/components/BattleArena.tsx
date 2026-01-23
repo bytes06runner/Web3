@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sword, Users, Shield, RefreshCw } from 'lucide-react';
+import { Sword, Shield, RefreshCw } from 'lucide-react';
 import { MockContract } from '../services/mockContract';
 import { BattleInterface } from './BattleInterface';
 
@@ -172,7 +172,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user }: Battl
                     onClose={() => setModalOpen(false)}
                     onLaunch={handleLaunch}
                     isRaiding={raiding}
-                    attacker={{ name: 'YOU', power: 100, unit: 'CYBER_UNIT' }}
+                    attacker={{ name: user?.username || 'YOU', power: 100, unit: 'CYBER_UNIT' }}
                     defender={{ 
                         name: selectedOpponent.username, 
                         defense: selectedOpponent.stats?.defense || 50, 
