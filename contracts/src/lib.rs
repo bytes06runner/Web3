@@ -3,274 +3,145 @@
 mod vault;
 mod battle;
 mod fitness;
+mod state_storage;
+mod escrow_manager;
+mod contract_engine;
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Symbol, Vec, symbol_short};
-use vault::Vault;
-use battle::{BattleRecord, BattleOutcome};
-use fitness::FitnessStats;
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
+use state_storage::{Base, TroopStats, get_base, set_base, get_troop_stats};
+use contract_engine::{simulate_raid, BattleResult, BattlePhase};
+use escrow_manager::Escrow;
 
 #[contract]
 pub struct YieldRaiders;
 
-#[contracttype]
-pub enum DataKey {
-    Vault(Address),
-    Fitness(Address),
-    Training(Address), // Track user training status
-    TotalYield, // Track protocol revenue
-}
-
-const SECONDS_PER_DAY: u64 = 86400;
-const YIELD_RATE_BPS: i128 = 5; // 0.05% daily (approx 18% APY for game purposes)
-const COMMAND_PER_YIELD: i128 = 10; // 10 Command tokens per 1 USDC yield
-
 #[contractimpl]
 impl YieldRaiders {
-    // ... (Existing Vault & Yield code remains, omitted for brevity if using replace_chunk, but since we are doing logic add, see chunks below) ...
-    // Note: I will use a separate replace call for adding functions to avoid messing up the whole file structure if not needed.
-    // Ideally I should append functions.
-
-    // --- TRAINING ---
-
-    pub fn request_drill(env: Env, user: Address) -> u64 {
-        user.require_auth();
-        // In real app: Check cooldown in storage
-        // Generate pseudo-random ID
-        let drill_id = env.ledger().timestamp() % 5; // 5 questions pool
-        
-        // Return drill ID (client maps this to question text)
-        drill_id
-    }
-
-    pub fn submit_drill(env: Env, user: Address, drill_id: u64, correct: bool) {
-        user.require_auth();
-        
-        // Verify answer (simplified: client sends 'correct', in real app we check hash)
-        if !correct {
-            panic!("Incorrect answer! Security breach detected.");
-        }
-
-        let key = DataKey::Vault(user.clone());
-        let mut vault: Vault = env.storage().persistent().get(&key).expect("Vault not found");
-
-        // Reward
-        vault.defense_power += 5;
-        vault.command_balance += 50; 
-        
-        env.storage().persistent().set(&key, &vault);
-    }
     
-    // --- VAULT & YIELD ---
+    pub fn initialize(env: Env, user: Address) {
+        user.require_auth();
+        if get_base(&env, user.clone()).is_none() {
+            let base = Base {
+                owner: user.clone(),
+                level: 1,
+                balance: 1000, // Starting balance bonus for demo
+                wall_hp: 100,
+                max_wall_hp: 100,
+                troop_level: 1,
+                troop_count: 10, // Starting troops
+                max_troops: 100,
+                last_claim_time: env.ledger().timestamp(),
+                shield_end_time: 0,
+            };
+            set_base(&env, user, &base);
+        }
+    }
 
     pub fn deposit(env: Env, user: Address, amount: i128) {
         user.require_auth();
-        
-        let key = DataKey::Vault(user.clone());
-        let mut vault = env.storage().persistent().get(&key).unwrap_or(Vault {
-            owner: user.clone(),
-            principal: 0,
-            command_balance: 0,
-            last_yield_time: env.ledger().timestamp(),
-            defense_power: 100, // Base defense
-            total_steps: 0,
-            stamina: 100,
-            unit_type: 0,
-            last_raid_time: 0,
-        });
-
-        // Claim pending yield before depositing
-        // Note: In real app we'd fetch streak here too, assuming 0 for deposit for simplicity or fetching
-        let pending_yield = Self::calculate_yield(&env, &vault, 0);
-        vault.command_balance += pending_yield * COMMAND_PER_YIELD;
-        
-        vault.principal += amount;
-        vault.last_yield_time = env.ledger().timestamp();
-        
-        env.storage().persistent().set(&key, &vault);
-    }
-
-    pub fn claim_yield(env: Env, user: Address) -> i128 {
-        user.require_auth();
-        let key = DataKey::Vault(user.clone());
-        let mut vault: Vault = env.storage().persistent().get(&key).expect("Vault not found");
-
-        // Fetch fitness stats for streak bonus
-        let fitness_key = DataKey::Fitness(user.clone());
-        let stats = env.storage().persistent().get::<DataKey, FitnessStats>(&fitness_key).unwrap_or(FitnessStats {
-            user: user.clone(),
-            steps_today: 0,
-            last_step_update: 0,
-            streak_days: 0,
-        });
-
-        let pending_yield = Self::calculate_yield(&env, &vault, stats.streak_days);
-        let command_earned = pending_yield * COMMAND_PER_YIELD;
-        
-        vault.command_balance += command_earned;
-
-        // Stamina Regen: 1 per 10 mins (approx 144 per day)
-        // usage: (now - last_time) / 600
-        let time_diff = env.ledger().timestamp() - vault.last_yield_time;
-        let regen = (time_diff / 600) as u32;
-        if regen > 0 {
-             vault.stamina = core::cmp::min(100, vault.stamina + regen);
-        }
-
-        vault.last_yield_time = env.ledger().timestamp();
-        
-        env.storage().persistent().set(&key, &vault);
-        
-        command_earned
+        let mut base = get_base(&env, user.clone()).expect("Base not initialized");
+        base.balance += amount;
+        set_base(&env, user, &base);
     }
     
-    pub fn get_vault(env: Env, user: Address) -> Option<Vault> {
-        env.storage().persistent().get(&DataKey::Vault(user))
+    pub fn upgrade_base(env: Env, user: Address) {
+        user.require_auth();
+        let mut base = get_base(&env, user.clone()).expect("Base not initialized");
+        
+        let cost = (base.level as i128) * 100;
+        if base.balance < cost {
+            panic!("Insufficient funds for upgrade");
+        }
+        
+        base.balance -= cost;
+        base.level += 1;
+        base.max_troops += 50; 
+        base.max_wall_hp += 100;
+        base.wall_hp = base.max_wall_hp;
+        
+        set_base(&env, user, &base);
+    }
+    
+    pub fn create_troops(env: Env, user: Address, amount: u32) {
+        user.require_auth();
+        let mut base = get_base(&env, user.clone()).expect("Base not initialized");
+        
+        let cost_per_unit: i128 = 10; 
+        let total_cost = (amount as i128) * cost_per_unit;
+        
+        if base.balance < total_cost {
+             panic!("Insufficient funds");
+        }
+        if base.troop_count + amount > base.max_troops {
+             panic!("Garrison full");
+        }
+        
+        base.balance -= total_cost;
+        base.troop_count += amount;
+        
+        set_base(&env, user, &base);
     }
 
-    fn calculate_yield(env: &Env, vault: &Vault, streak_days: u32) -> i128 {
-        let time_diff = env.ledger().timestamp() - vault.last_yield_time;
-        if time_diff < SECONDS_PER_DAY {
-            return 0; // Simplify: daily yield only
-        }
-        let days = (time_diff / SECONDS_PER_DAY) as i128;
-        
-        // Base Rate + Streak Bonus (0.01% per streak day, max 10 days = 0.1%)
-        // YIELD_RATE_BPS is 5 (0.05%). Let's add bonus.
-        // Bonus BPS = min(streak, 10) * 10 (10 bps = 0.1%)
-        let bonus_bps = (core::cmp::min(streak_days, 10) * 10) as i128;
-        let total_rate = YIELD_RATE_BPS + bonus_bps;
-
-        (vault.principal * total_rate * days) / 10000
-    }
-
-    // --- FITNESS ---
-
-    pub fn record_steps(env: Env, user: Address, steps: u32) {
-        // In reality, this would be authenticated by an Oracle node
-        // For hackathon/demo, we allow self-reporting or any caller
-        // user.require_auth(); // Or oracle auth
-        
-        let key = DataKey::Fitness(user.clone());
-        let mut stats = env.storage().persistent().get(&key).unwrap_or(FitnessStats {
-            user: user.clone(),
-            steps_today: 0,
-            last_step_update: env.ledger().timestamp(),
-            streak_days: 0,
-        });
-
-        // Reset if new day (simplified)
-        let time_diff = env.ledger().timestamp() - stats.last_step_update;
-        if time_diff > SECONDS_PER_DAY {
-             // If strictly consecutive (within 48h?), keep streak, else reset
-             // Simplified: Always increment if > 1000 steps and it's a new day
-             if stats.steps_today >= 1000 {
-                 stats.streak_days += 1;
-             } else if time_diff > SECONDS_PER_DAY * 2 {
-                 stats.streak_days = 0; // Lost streak
-             }
-            stats.steps_today = 0;
-        }
-
-        stats.steps_today += steps;
-        stats.last_step_update = env.ledger().timestamp();
-        
-        env.storage().persistent().set(&key, &stats);
-
-        // Update Vault with fitness boost
-        let vault_key = DataKey::Vault(user.clone());
-        if let Some(mut vault) = env.storage().persistent().get::<DataKey, Vault>(&vault_key) {
-            vault.total_steps += steps;
-            // Bonus: 1 Command per 1000 steps
-            let bonus = (steps / 1000) as i128;
-            if bonus > 0 {
-                vault.command_balance += bonus;
-                env.storage().persistent().set(&vault_key, &vault);
-            }
-        }
-    }
-
-    // --- BATTLE ---
-
-    pub fn raid(env: Env, attacker: Address, defender: Address) -> BattleOutcome {
+    pub fn raid(env: Env, attacker: Address, defender: Address, troop_count: u32) -> BattleResult {
         attacker.require_auth();
         
-        let attacker_key = DataKey::Vault(attacker.clone());
-        let defender_key = DataKey::Vault(defender.clone());
+        let mut base_attacker = get_base(&env, attacker.clone()).expect("Attacker base not found");
+        let mut base_defender = get_base(&env, defender.clone()).expect("Defender base not found");
         
-        let mut attacker_vault: Vault = env.storage().persistent().get(&attacker_key).expect("Attacker has no vault");
-        let mut defender_vault: Vault = env.storage().persistent().get(&defender_key).expect("Defender has no vault");
-
-        // Raid Cost
-        let raid_cost_cmd = 10;
-        let raid_cost_stamina = 20;
-
-        if attacker_vault.command_balance < raid_cost_cmd {
-            panic!("Not enough Command tokens");
+        if env.ledger().timestamp() < base_defender.shield_end_time {
+             panic!("Defender is shielded");
         }
-        if attacker_vault.stamina < raid_cost_stamina {
-            panic!("Not enough Stamina");
+        
+        if base_attacker.troop_count < troop_count {
+             panic!("Not enough troops");
         }
-
-        // Cooldown Check (Regen period for defender)
-        let now = env.ledger().timestamp();
-        if now - defender_vault.last_raid_time < 300 { // 5 minutes immunity
-             panic!("Target is under protection shield");
-        }
-
-        attacker_vault.command_balance -= raid_cost_cmd;
-        attacker_vault.stamina -= raid_cost_stamina;
-
-        // --- BATTLE LOGIC ---
         
-        // 1. Calculate Unit Advantage (Infantry > Archer > Cavalry > Infantry)
-        // 0=Infantry, 1=Archer, 2=Cavalry
-        // +20% bonus if Advantage
-        let mut unit_bonus_pct = 0;
-        let atk_unit = attacker_vault.unit_type;
-        let def_unit = defender_vault.unit_type;
+        let att_stats = get_troop_stats(base_attacker.troop_level);
+        let def_stats = get_troop_stats(base_defender.troop_level);
         
-        if (atk_unit == 0 && def_unit == 1) || (atk_unit == 1 && def_unit == 2) || (atk_unit == 2 && def_unit == 0) {
-            unit_bonus_pct = 20;
-        }
-
-        // 2. Power Calculation
-        let base_power = attacker_vault.defense_power + (attacker_vault.total_steps / 100);
-        let attack_power = base_power + (base_power * unit_bonus_pct / 100);
+        let result = simulate_raid(&env, &base_defender, troop_count, &att_stats, &def_stats);
         
-        let defense_power = defender_vault.defense_power + (defender_vault.total_steps / 100);
-        
-        // 3. Pseudo-random factor
-        // Power = Base Defense + (Steps / 100)
-        let attack_power = attacker_vault.defense_power + (attacker_vault.total_steps / 100);
-        let defense_power = defender_vault.defense_power + (defender_vault.total_steps / 100);
-        
-        // Pseudo-random factor using timestamp
-        let luck = (env.ledger().timestamp() % 50) as u32; // 0-49 bonus
-        
-        let outcome = if attack_power + luck > defense_power {
-            // Victory: Steal 20% of yield-equivalent in Command tokens
-            let loot = (defender_vault.command_balance * 20) / 100;
-            defender_vault.command_balance -= loot;
-            attacker_vault.command_balance += loot;
+        if result.success {
+            let loot_pool = (base_defender.balance * 20) / 100;
+            let (raider_share, fee, _) = Escrow::calculate_payout(&env, result.destruction_percent, loot_pool);
             
-            // Mark defender for shield
-            defender_vault.last_raid_time = now;
+            base_defender.balance -= (raider_share + fee);
+            base_attacker.balance += raider_share;
             
-            BattleOutcome::Victory
+             if result.phase == BattlePhase::Breach {
+                  base_defender.wall_hp = 0; 
+             } else {
+                  base_defender.wall_hp = 0;
+             }
         } else {
-            BattleOutcome::Defeat
-        };
-
-        // Update timestamps
-        attacker_vault.last_raid_time = now;
-
-        // Save states
-        env.storage().persistent().set(&attacker_key, &attacker_vault);
-        env.storage().persistent().set(&defender_key, &defender_vault);
+             let total_potential = (troop_count as u64) * (att_stats.stamina as u64) * (att_stats.damage as u64);
+             let damage = total_potential as u32;
+             if damage >= base_defender.wall_hp {
+                 base_defender.wall_hp = 0;
+             } else {
+                 base_defender.wall_hp -= damage;
+             }
+        }
         
-        outcome
+        if result.destruction_percent == 100 {
+             base_attacker.troop_count -= troop_count / 10; 
+        } else if result.destruction_percent >= 30 {
+             base_attacker.troop_count -= troop_count / 2;
+        } else {
+             base_attacker.troop_count -= troop_count;
+        }
+        
+        if result.destruction_percent >= 30 {
+             base_defender.shield_end_time = env.ledger().timestamp() + 300; 
+        }
+        
+        set_base(&env, attacker, &base_attacker);
+        set_base(&env, defender, &base_defender);
+        
+        result
+    }
+    
+     pub fn get_my_base(env: Env, user: Address) -> Option<Base> {
+        get_base(&env, user)
     }
 }
-
-
-// $env:Path += ";$env:USERPROFILE\.cargo\bin"; stellar contract deploy --wasm target/wasm32-unknown-unknown/release/yield_raiders_contracts.wasm --source mykey --network testnet

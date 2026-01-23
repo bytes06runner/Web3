@@ -13,7 +13,10 @@ interface GameState {
     history: string[];
     stamina: number;
     streakDays: number;
-    lastStepDate: number; // timestamp
+    lastStepDate: number; 
+    wallHp: number;
+    troopCount: number;
+    troopLevel: number;
 }
 
 const INITIAL_STATE: GameState = {
@@ -26,7 +29,10 @@ const INITIAL_STATE: GameState = {
     history: ['Welcome to Yield Raiders! Deposit USDC or Connect Wallet to start.'],
     stamina: 100,
     streakDays: 0,
-    lastStepDate: 0
+    lastStepDate: 0,
+    wallHp: 100,
+    troopCount: 50,
+    troopLevel: 1
 };
 
 export const MockContract = {
@@ -49,7 +55,7 @@ export const MockContract = {
     deposit: (amount: number) => {
         const state = MockContract.getState();
         state.principal += amount;
-        state.history.unshift(`Deposited $${amount} USDC`);
+        state.history.unshift(`Deposited ${amount} USDC`);
         MockContract.saveState(state);
         return state;
     },
@@ -91,62 +97,92 @@ export const MockContract = {
         return state;
     },
 
-    // Updated Logic for Transaction Integration (called from App.tsx normally, but logic helpers here)
-    raid: async (targetName: string, userPublicKey: string) => {
+    raid: async (targetName: string, userPublicKey: string, troopCount: number = 10) => {
         const state = MockContract.getState();
-        const COST_STM = 20;
+        
+        const TROOP_DMG = 5;
+        const TROOP_STA = 20;
+        
+        if (state.troopCount < troopCount) {
+             throw new Error("Not enough troops in garrison!");
+        }
 
-        if (state.stamina < COST_STM) throw new Error(`Not enough Stamina (Need ${COST_STM})`);
+        const totalPotential = troopCount * TROOP_STA * TROOP_DMG;
+        const wallHp = state.wallHp || 100; 
         
-        // Win Rate 50%
-        const success = Math.random() < 0.5; 
-        
-        if (success) {
-             // Win: Gain 30-50 XLM
-             const reward = Math.floor(Math.random() * 21) + 30; // 30 to 50
-             state.history.unshift(`⚔️ Raid on ${targetName} WON! Requesting Payout of ${reward} XLM...`);
-             MockContract.saveState(state);
-             
-             try {
-                await StellarService.payoutToUser(userPublicKey, reward.toString());
-                const stateAfter = MockContract.getState();
-                stateAfter.commandTokens += reward; // Also give CMD tokens?
-                stateAfter.history.unshift(`✅ Payout Received! +${reward} XLM`);
-                stateAfter.stamina -= COST_STM;
-                MockContract.saveState(stateAfter);
-                return { success: true, reward };
-             } catch(e) {
-                 const stateErr = MockContract.getState();
-                 stateErr.history.unshift(`❌ Payout Failed: ${e.message}`);
-                 MockContract.saveState(stateErr);
-                 throw e;
-             }
+        let destruction = 0;
+        let success = false;
+        let reward = 0;
+        let logMsg = "";
+        let phase = "Breach";
+
+        // --- PHASE 1: BREACH ---
+        if (totalPotential < wallHp) {
+             destruction = 0;
+             success = false;
+             logMsg = `🛡️ Raid on ${targetName} BLOCKED by Wall. 0% Destruction.`;
         } else {
-            // Loss: Deduct 50 XLM (User pays Bank)
-            const penalty = 50;
-             state.history.unshift(`🛡️ Raid on ${targetName} FAILED. Penalty: ${penalty} XLM...`);
-             MockContract.saveState(state);
-
-             try {
-                 await StellarService.createPaymentToBank(userPublicKey, penalty.toString());
-                 const stateAfter = MockContract.getState();
-                 stateAfter.history.unshift(`💸 Penalty Paid: -${penalty} XLM`);
-                 stateAfter.stamina -= COST_STM;
-                 MockContract.saveState(stateAfter);
-                 return { success: false, penalty };
-             } catch(e) {
-                 const stateErr = MockContract.getState();
-                 stateErr.history.unshift(`❌ Penalty Transaction Failed or Rejected`);
-                 MockContract.saveState(stateErr);
-                 throw e;
+             destruction = 30;
+             phase = "Ambush";
+             
+             const staminaConsumed = Math.ceil(wallHp / TROOP_DMG);
+             const totalStaminaPool = troopCount * TROOP_STA;
+             let remainingStamina = totalStaminaPool - staminaConsumed;
+             
+             if (remainingStamina <= 0) {
+                 logMsg = `⚠️ Wall Breached (30%), but troops exhausted!`;
+                 success = true; 
+             } else {
+                 // --- PHASE 2: AMBUSH ---
+                 const DEF_TROOPS = 10; 
+                 const defenderPower = DEF_TROOPS * TROOP_DMG * TROOP_STA;
+                 
+                 const attackerPower = remainingStamina * TROOP_DMG;
+                 
+                 if (attackerPower > defenderPower) {
+                      destruction = (attackerPower > defenderPower * 1.5) ? 100 : 50;
+                      success = true;
+                      logMsg = `⚔️ Raid on ${targetName} VICTORY! (${destruction}% Destruction)`;
+                 } else {
+                      destruction = 30; 
+                      success = true; 
+                      logMsg = `⚠️ Wall Breached, but Ambush repelled!`;
+                 }
              }
         }
+        
+        let payoutPct = 0;
+        if (destruction >= 100) payoutPct = 0.9;
+        else if (destruction >= 50) payoutPct = 0.5;
+        else if (destruction >= 30) payoutPct = 0.2;
+        
+        const POOL = 500;
+        reward = Math.floor(POOL * payoutPct);
+        
+        if (success && reward > 0) {
+             state.history.unshift(logMsg + ` Payout: ${reward} XLM`);
+             try {
+                // await StellarService.payoutToUser(userPublicKey, reward.toString());
+                state.commandTokens += reward; 
+                state.history.unshift(`✅ Payout Received! +${reward} XLM`);
+             } catch(e) {
+                 state.history.unshift(`❌ Payout Tx Simulated Failed`);
+             }
+        } else {
+             state.history.unshift(logMsg);
+        }
+        
+        if (destruction === 100) state.troopCount -= Math.floor(troopCount * 0.1);
+        else if (destruction >= 30) state.troopCount -= Math.floor(troopCount * 0.5);
+        else state.troopCount -= Math.floor(troopCount * 0.8); 
+        
+        state.troopCount = Math.max(0, state.troopCount);
+
+        MockContract.saveState(state);
+        return { success, reward, destruction, phase };
     },
 
     requestDrill: async (userPublicKey: string) => {
-         // Stake 10 XLM
-         // This needs to happen BEFORE the question is revealed ideally, or as "Entry Fee"?
-         // User said: "request drill... stake 10 XLM"
          try {
              await StellarService.createPaymentToBank(userPublicKey, "10");
              const state = MockContract.getState();
@@ -167,7 +203,6 @@ export const MockContract = {
     submitDrill: async (correct: boolean, userPublicKey: string) => {
         const state = MockContract.getState();
         if (correct) {
-            // Stake 10 was paid. Win 5 extra -> Total 15 payout.
             try {
                 await StellarService.payoutToUser(userPublicKey, "15");
                 state.history.unshift(`✅ Correct! Received 15 XLM (Stake + Reward)`);
@@ -177,7 +212,6 @@ export const MockContract = {
                 state.history.unshift(`❌ Reward Payout Failed`);
             }
         } else {
-            // Lose -> Lose another 10 XLM (Total 20 loss since 10 staked already)
             try {
                 await StellarService.createPaymentToBank(userPublicKey, "10");
                 state.stamina = Math.max(0, state.stamina - 5);
