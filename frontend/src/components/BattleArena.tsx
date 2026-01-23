@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Sword, Users, Shield, RefreshCw } from 'lucide-react';
 import { MockContract } from '../services/mockContract';
-import { BreachTerminal } from './BreachTerminal';
+import { BattleInterface } from './BattleInterface';
 
 interface BattleArenaProps {
     refreshGame: () => void;
@@ -16,6 +16,8 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user }: Battl
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedOpponent, setSelectedOpponent] = useState<any>(null);
     const [raiding, setRaiding] = useState(false);
+    const [logs, setLogs] = useState<string[]>([]);
+    const [battleResult, setBattleResult] = useState<any>(null);
 
     useEffect(() => {
         fetchOpponents();
@@ -46,19 +48,54 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user }: Battl
             return;
         }
         setSelectedOpponent(opponent);
+        setLogs(["ready_for_deployment..."]);
+        setBattleResult(null);
         setModalOpen(true);
     };
 
-    const executeRaid = async () => {
-        setModalOpen(false);
+    const handleLaunch = async () => {
         if (!selectedOpponent) return;
-        
         setRaiding(true);
+        setLogs([]); // Clear init log
+
+        const addLog = (msg: string) => setLogs(prev => [...prev, msg]);
+
+        addLog("INITIALIZING COMBAT PROTOCOL...");
+        await new Promise(r => setTimeout(r, 600));
+        addLog(`TARGET LOCKED: ${selectedOpponent.username}`);
+        await new Promise(r => setTimeout(r, 600));
+        addLog("DEPLOYING INCURSION UNIT...");
+        await new Promise(r => setTimeout(r, 800));
+        addLog("PHASE 1: INITIATING WALL BREACH...");
+
         try {
             const targetName = selectedOpponent.username || 'Unknown';
+            // Visual delay for "Breaching"
+            await new Promise(r => setTimeout(r, 1500));
+            
             const result = await MockContract.raid(targetName, walletAddress!);
 
-            // Update Backend Stats
+            if (result.phase === 'Breach' && !result.success) {
+                 addLog("❌ WARNING: WALL BREACH FAILED.");
+                 addLog("DEFENSE MATRIX TOO STRONG.");
+            } else {
+                 addLog("✅ WALL BREACHED! PROCEEDING TO AMBUSH...");
+                 await new Promise(r => setTimeout(r, 800));
+                 addLog("PHASE 2: AMBUSH ENGAGED...");
+                 await new Promise(r => setTimeout(r, 1200));
+                 
+                 if (result.success) {
+                      addLog(`🚀 VICTORY! DESTRUCTION: ${result.destruction}%`);
+                      addLog(`💰 TRANSFERRING LOOT: ${result.reward} XLM`);
+                 } else {
+                      addLog("⚠️ AMBUSH REPELLED.");
+                      addLog(`💸 RETREAT! PENALTY PAID: ${(result as any).penalty || 0} XLM`);
+                 }
+            }
+            
+            setBattleResult(result);
+
+            // Sync
             try {
                 await fetch('/api/update_stats', {
                     method: 'POST',
@@ -69,23 +106,14 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user }: Battl
                         success: result.success
                     })
                 });
-            } catch (err) {
-                console.error("Failed to sync stats", err);
-            }
+            } catch (err) { console.error(err); }
 
             refreshGame(); 
-
-            if (result.success) {
-                onToast?.('success', `Raid Successful! (${result.destruction}% Dmg) +${result.reward} XLM`);
-            } else {
-                const phaseInfo = result.phase === 'Breach' ? 'Wall Blocked' : 'Ambush failed';
-                onToast?.('error', `Raid Failed (${phaseInfo}). Penalty: ${(result as any).penalty || 0} XLM.`);
-            }
+            
         } catch (e: any) {
-            onToast?.('error', e.message || 'Raid Failed');
+            addLog(`❌ ERROR: ${e.message || 'Raid Failed'}`);
         } finally {
             setRaiding(false);
-            setSelectedOpponent(null);
         }
     };
 
@@ -108,7 +136,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user }: Battl
 
                 <div className="space-y-3">
                     {opponents.length === 0 && !loading && (
-                        <div className="text-center text-gray-500 py-4">No opponents found in range.</div>
+                        <div className="text-center text-gray-500 py-4">No opponents found.</div>
                     )}
                     
                     {opponents.map((opp) => (
@@ -131,27 +159,27 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user }: Battl
                                 disabled={raiding}
                                 className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2"
                             >
-                                {raiding && selectedOpponent?.username === opp.username ? 'Raiding...' : 'RAID'}
+                                BATTLE
                             </button>
                         </div>
                     ))}
                 </div>
-                
-                 <div className="mt-4 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20 flex items-start gap-2">
-                    <Users size={16} className="text-blue-400 mt-1" />
-                    <div className="text-xs text-blue-200">
-                        <strong>Alliance Tip:</strong> Form an alliance to boost your defense by 50%. (Coming soon)
-                    </div>
-                </div>
             </div>
 
             {selectedOpponent && (
-                <BreachTerminal 
+                <BattleInterface 
                     isOpen={modalOpen} 
                     onClose={() => setModalOpen(false)}
-                    onBreach={executeRaid}
-                    attackerStats={user?.stats}
-                    opponent={selectedOpponent}
+                    onLaunch={handleLaunch}
+                    isRaiding={raiding}
+                    attacker={{ name: 'YOU', power: 100, unit: 'CYBER_UNIT' }}
+                    defender={{ 
+                        name: selectedOpponent.username, 
+                        defense: selectedOpponent.stats?.defense || 50, 
+                        unit: 'FORTRESS_V1' 
+                    }}
+                    logs={logs}
+                    result={battleResult}
                 />
             )}
         </>
