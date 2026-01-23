@@ -76,9 +76,10 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user }: Battl
             refreshGame(); 
 
             if (result.success) {
-                onToast?.('success', `Raid Successful! +${result.reward} XLM`);
+                onToast?.('success', `Raid Successful! (${result.destruction}% Dmg) +${result.reward} XLM`);
             } else {
-                onToast?.('error', `Raid Failed. Wallet deducted ${result.penalty} XLM.`);
+                const phaseInfo = result.phase === 'Breach' ? 'Wall Blocked' : 'Ambush failed';
+                onToast?.('error', `Raid Failed (${phaseInfo}). Penalty: ${(result as any).penalty || 0} XLM.`);
             }
         } catch (e: any) {
             onToast?.('error', e.message || 'Raid Failed');
