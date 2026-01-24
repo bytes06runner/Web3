@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Timer, Zap, Coins } from 'lucide-react';
+import { Users, Zap, Coins } from 'lucide-react'; // Removed Timer if unused
 import { MockContract } from '../services/mockContract';
 import { StellarService } from '../services/stellarService';
 
@@ -13,8 +13,6 @@ interface BarracksProps {
 }
 
 export const Barracks: React.FC<BarracksProps> = ({ troops, commandTokens, stamina, walletAddress, onTrain, onToast }) => {
-    const [training, setTraining] = useState<string | null>(null);
-
     const handleTrain = async (type: 'archers' | 'cavalry' | 'giants') => {
         try {
             MockContract.trainTroops(type);
@@ -65,7 +63,7 @@ export const Barracks: React.FC<BarracksProps> = ({ troops, commandTokens, stami
             <div className="mb-6 bg-black/40 rounded-full h-4 overflow-hidden relative group cursor-pointer" onClick={handleRefillStrength} title="Click to Refill (10 XLM)">
                 <div 
                     className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-500"
-                    style={{ width: `${stamina}%` }}
+                    style={{ width: stamina + '%' }}
                 />
                 <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
                     REFILL (10 XLM)
