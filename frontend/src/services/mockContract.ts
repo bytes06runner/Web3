@@ -16,7 +16,7 @@ interface BaseState {
 
 interface TroopQueue {
     archers: number;
-    cavalry: number;
+    infantry: number;
     giants: number;
     trainingUntil: number;
 }
@@ -69,7 +69,7 @@ const INITIAL_STATE: GameState = {
     },
     troops: {
         archers: 0,
-        cavalry: 0,
+        infantry: 0,
         giants: 0,
         trainingUntil: 0
     },
@@ -130,33 +130,41 @@ export const MockContract = {
     },
 
     
-    trainTroops: (type: 'archers' | 'cavalry' | 'giants') => {
+        trainTroops: (type: 'archers' | 'infantry' | 'giants') => {
         const state = MockContract.getState();
-        const cost = type === 'archers' ? 10 : type === 'cavalry' ? 25 : 50;
+        const troops = state.troops || { archers: 0, infantry: 0, giants: 0, trainingUntil: 0 };
         
-        if (state.commandTokens < cost) throw new Error("Not enough Command Tokens");
+        // Limits & Costs
+        const RULES = {
+            archers: { cost: 5, limit: 4 },
+            infantry: { cost: 10, limit: 3 },
+            giants: { cost: 20, limit: 3 }
+        };
         
-        state.commandTokens -= cost;
+        const unit = RULES[type];
+        if (!unit) throw new Error("Invalid Unit Type");
         
-        // Simulating instant training for demo flow, or small delay could be added
-        if (!state.troops) state.troops = { archers: 0, cavalry: 0, giants: 0, trainingUntil: 0 };
+        // 1. Check Unit Limit
+        if ((troops[type] || 0) >= unit.limit) {
+            throw new Error(`Max ${unit.limit} ${type} allowed!`);
+        }
         
-        state.troops[type] = (state.troops[type] || 0) + 1;
-        state.history.unshift(`Trained ${type.toUpperCase()}`);
+        // 2. Check Capacity
+        const usedCapacity = (troops.archers * 5) + (troops.infantry * 10) + (troops.giants * 20);
+        if (usedCapacity + unit.cost > 100) {
+            throw new Error(`Insufficient Capacity! (${usedCapacity}/100)`);
+        }
         
+        // Train
+        troops[type] = (troops[type] || 0) + 1;
+        state.troops = troops;
+        
+        state.history.unshift(`Trained ${type.toUpperCase()} (Occupy ${unit.cost} Cap)`);
         MockContract.saveState(state);
         return state;
     },
-    
-    
-    skipCooldown: () => {
-        const state = MockContract.getState();
-        state.cooldownUntil = 0;
-        state.consecutiveWins = 0; // Reset counter too? Usually yes if paid.
-        state.history.unshift("⏩ Cooldown Skipped (Paid).");
-        MockContract.saveState(state);
-        return state;
-    },
+
+
     refillStrength: () => {
         // This simulates the paid transaction callback
         const state = MockContract.getState();
@@ -182,114 +190,66 @@ export const MockContract = {
         return state;
     },
 
-                    raid: async (targetName: string, userPublicKey: string, troopCount: number = 10, defenderStats: any = { defense: 50, unit: 'FORTRESS_V1' }) => {
+                        raid: async (targetName: string, userPublicKey: string, troopCount: number = 0, defenderStats: any = { defense: 50 }) => {
         const state = MockContract.getState();
+        const troops = state.troops || { archers: 0, infantry: 0, giants: 0 };
         
-        // --- COOLDOWN CHECK ---
-        const now = Date.now();
-        if (state.cooldownUntil && state.cooldownUntil > now) {
-            const remaining = Math.ceil((state.cooldownUntil - now) / 1000);
-            throw new Error(`Army Resting! Cooldown: ${remaining}s`);
-        }
-
-        // --- STAMINA/CAPACITY CHECK ---
-        const STAMINA_COST = 10;
-        if (state.stamina < STAMINA_COST) throw new Error("Insufficient Stamina!");
-        state.stamina -= STAMINA_COST;
-
-        // --- COMBAT STATS CALCULATOR ---
-        // Attacker Power = Base Troop * (Troops trained)
-        // For simplified MVP, we use the `troopCount` param passed from UI (or 10) PLUS trained troops bonus
+        // DPS Calculation
+        const dps = (troops.archers * 3) + (troops.infantry * 5) + (troops.giants * 7);
+        const defenderDefense = defenderStats.defense || 50;
         
-        let archerPower = (state.troops?.archers || 0) * 5;
-        let cavalryPower = (state.troops?.cavalry || 0) * 15;
-        let giantPower = (state.troops?.giants || 0) * 50;
+        let logMsg = `⚔️ RAID (STAKED 100 XLM)
+Army DPS: ${dps} vs Defense: ${defenderDefense}`;
         
-        let totalAttack = (troopCount * 15) + archerPower + cavalryPower + giantPower;
-        
-        // Defender Stats (Simulated)
-        const defWall = defenderStats.wallHp || 1000;
-        const defArmy = defenderStats.armyHp || 500;
-        const defTownhall = defenderStats.townhallHp || 2000;
-        
-        let logMsg = `⚔️ RAID INITIATED! Power: ${totalAttack}`;
-        let currentDmg = totalAttack;
-        let phase = "";
+        const success = dps > defenderDefense;
         let destruction = 0;
-        
-        // --- PHASE 1: WALL ---
-        let dmgWall = Math.min(currentDmg, defWall);
-        currentDmg -= dmgWall;
-        logMsg += `
-🧱 WALL: Dealt ${dmgWall} DMG.`;
-        
-        if (currentDmg <= 0) {
-            phase = "Wall";
-            destruction = (dmgWall / (defWall + defArmy + defTownhall)) * 100;
-            logMsg += ` Attack Stopped at Wall.`;
-        } else {
-             // --- PHASE 2: ARMY ---
-             logMsg += ` WALL BREACHED!`;
-             let dmgArmy = Math.min(currentDmg, defArmy);
-             currentDmg -= dmgArmy;
-             logMsg += `
-🛡️ DEFENSE ARMY: Dealt ${dmgArmy} DMG.`;
-             
-             if (currentDmg <= 0) {
-                 phase = "Army";
-                 destruction = ((defWall + dmgArmy) / (defWall + defArmy + defTownhall)) * 100;
-                 logMsg += ` Attack Stopped by Army.`;
-             } else {
-                 // --- PHASE 3: TOWNHALL ---
-                 logMsg += ` ARMY DEFEATED!`;
-                 let dmgTownhall = Math.min(currentDmg, defTownhall);
-                 // Bonus Dmg to structure
-                 dmgTownhall *= 1.5; 
-                 
-                 phase = "Townhall";
-                 destruction = ((defWall + defArmy + dmgTownhall) / (defWall + defArmy + defTownhall)) * 100;
-                 logMsg += `
-🏰 TOWNHALL: Dealt ${dmgTownhall.toFixed(0)} DMG.`;
-                 
-                 if (dmgTownhall >= defTownhall) {
-                     logMsg += ` BASE DESTROYED!`;
-                     destruction = 100;
-                 }
-             }
-        }
-        
-        let success = destruction > 30; // Win condition
-        
-        // Escrow Payout Logic
         let reward = 0;
-        if (destruction >= 100) reward = 200; // 2x Wager (Simulated 100 wager)
-        else if (destruction >= 30) reward = 50 + Math.floor(destruction); // Partial
         
         if (success) {
+            const margin = dps - defenderDefense;
+            destruction = Math.min(100, 50 + (margin * 5));
+            
+            const stakeRefund = Math.floor(100 * (destruction / 100));
+            const loot = 20; 
+            reward = stakeRefund + loot;
+            
+            logMsg += `
+✅ VICTORY! Destruction: ${destruction.toFixed(0)}%`;
+            logMsg += `
+💰 RECOVERED: ${stakeRefund} XLM + LOOT: ${loot} XLM`;
+            
             state.consecutiveWins = (state.consecutiveWins || 0) + 1;
-            if (state.consecutiveWins >= 5) {
-                state.cooldownUntil = Date.now() + 10000;
-                state.consecutiveWins = 0;
-                logMsg += " (💤 Fatigue: 10s Cooldown)";
-            }
-            state.commandTokens += reward * 5;
+            state.commandTokens += 50; 
             state.yieldEarned += reward;
-            logMsg += `
-💰 LOOT: ${reward} XLM`;
         } else {
-            state.consecutiveWins = 0;
             logMsg += `
-❌ RAID FAILED. Defense Held.`;
+❌ DEFEAT. Invaders wiped out.`;
+            logMsg += `
+💸 LOST STAKE: 100 XLM`;
+            state.consecutiveWins = 0;
         }
+        
+        // Consume Units
+        state.troops = { archers: 0, infantry: 0, giants: 0, trainingUntil: 0 };
+        logMsg += `
+📉 Units Deployed & Consumed.`;
 
         state.history.unshift(logMsg.split('
-')[0]); // Summary only for feed
+')[0]);
         MockContract.saveState(state);
         
-        return { success, reward, destruction, phase, log: logMsg };
+        return { success, reward, destruction, log: logMsg };
     },
 
 
+    
+    upgradeDefense: () => {
+        const state = MockContract.getState();
+        state.defense += 5;
+        state.history.unshift(`🛡️ Defense Upgraded to ${state.defense}`);
+        MockContract.saveState(state);
+        return state;
+    },
     requestDrill: async (userPublicKey: string) => {
          try {
              await StellarService.createPaymentToBank(userPublicKey, "10");

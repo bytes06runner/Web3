@@ -130,4 +130,19 @@ export class StellarService {
       }
   }
 
+
+  /**
+   * Stakes 100 XLM for a Raid.
+   */
+  static async stakeRaid(userPublicKey: string): Promise<string> {
+      return this.deposit(userPublicKey, "100");
+  }
+
+  /**
+   * Upgrades Defense for cost.
+   */
+  static async upgradeDefense(userPublicKey: string, cost: string): Promise<string> {
+      return this.deposit(userPublicKey, cost);
+  }
+
 }

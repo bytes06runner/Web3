@@ -88,65 +88,62 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
         }
     };
 
-    const handleLaunch = async () => {
+        const handleLaunch = async () => {
         if (!selectedOpponent) return;
+        
+        // V3 Staking Check
+        if (!walletAddress) {
+            onToast?.('error', 'Connect Wallet to Stake');
+            return;
+        }
+        
+        // Calculate Logic for Pre-Check (Visual only)
+        const dps = ((user?.troops?.archers||0)*3) + ((user?.troops?.infantry||0)*5) + ((user?.troops?.giants||0)*7);
+        const def = selectedOpponent.stats?.defense || 50;
+        
+        if (dps <= def) {
+             // Optional Warning
+             // onToast('error', 'Commander! Our DPS is too low to breach!');
+             // We can let them fail if they want to lose 100 XLM... 
+        }
+
         setRaiding(true);
-        setLogs([]); // Clear init log
+        setLogs([]); 
 
         const addLog = (msg: string) => setLogs(prev => [...prev, msg]);
 
-        addLog("INITIALIZING COMBAT PROTOCOL...");
-        await new Promise(r => setTimeout(r, 600));
-        addLog(`TARGET LOCKED: ${selectedOpponent.username}`);
-        await new Promise(r => setTimeout(r, 600));
-        addLog("DEPLOYING INCURSION UNIT...");
-        await new Promise(r => setTimeout(r, 800));
-        addLog("PHASE 1: INITIATING WALL BREACH...");
-
+        addLog("🔗 INITIATING SECURE STAKE PROTOCOL...");
+        
         try {
-            const targetName = selectedOpponent.username || 'Unknown';
-            // Visual delay for "Breaching"
-            await new Promise(r => setTimeout(r, 1500));
+            // 1. Stake
+            await StellarService.deposit(walletAddress, "100");
+            addLog("💰 STAKE LOCKED: 100 XLM");
+            await new Promise(r => setTimeout(r, 800));
             
-            const result = await MockContract.raid(targetName, walletAddress!, 10, selectedOpponent.stats);
+            addLog("🚀 LAUNCHING V3 ASSAULT UNITS...");
+            addLog(`⚔️ TOTAL ARMY DPS: ${dps}`);
+            await new Promise(r => setTimeout(r, 1000));
 
-            if (result.phase === 'Breach' && !result.success) {
-                 addLog("❌ WARNING: WALL BREACH FAILED.");
-                 addLog("DEFENSE MATRIX TOO STRONG.");
+            // 2. Execute Raid Math
+            const targetName = selectedOpponent.username || 'Unknown';
+            const result = await MockContract.raid(targetName, walletAddress, 0, selectedOpponent.stats);
+
+            if (result.success) {
+                 addLog("✅ DEFENSE PENETRATED!");
+                 addLog(`💥 DESTRUCTION: ${result.destruction.toFixed(1)}%`);
+                 addLog(`💸 PAYOUT: ${result.reward} XLM`);
             } else {
-                 addLog("✅ WALL BREACHED! PROCEEDING TO AMBUSH...");
-                 await new Promise(r => setTimeout(r, 800));
-                 addLog("PHASE 2: AMBUSH ENGAGED...");
-                 await new Promise(r => setTimeout(r, 1200));
-                 
-                 if (result.success) {
-                      addLog(`🚀 VICTORY! DESTRUCTION: ${result.destruction}%`);
-                      addLog(`💰 TRANSFERRING LOOT: ${result.reward} XLM`);
-                 } else {
-                      addLog("⚠️ AMBUSH REPELLED.");
-                      addLog(`💸 RETREAT! PENALTY PAID: ${(result as any).penalty || 0} XLM`);
-                 }
+                 addLog("🛡️ ATTACK REPELLED.");
+                 addLog("⚠️ STAKE LIQUIDATED.");
             }
             
             setBattleResult(result);
-
-            // Sync
-            try {
-                await fetch('/api/update_stats', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        attackerWallet: walletAddress,
-                        defenderUsername: targetName,
-                        success: result.success
-                    })
-                });
-            } catch (err) { console.error(err); }
-
+            // Wait a moment before refreshing to show results
+            await new Promise(r => setTimeout(r, 1000));
             refreshGame(); 
             
         } catch (e: any) {
-            addLog(`❌ ERROR: ${e.message || 'Raid Failed'}`);
+            addLog(`❌ RAID ABORTED: ${e.message}`);
         } finally {
             setRaiding(false);
         }

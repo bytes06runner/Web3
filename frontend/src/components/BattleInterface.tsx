@@ -188,7 +188,7 @@ export const BattleInterface: React.FC<BattleInterfaceProps> = ({
                                     onClick={onLaunch}
                                     className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-3 px-8 rounded clip-path-polygon hover:shadow-[0_0_20px_rgba(6,182,212,0.5)] transition-all uppercase tracking-wider"
                                 >
-                                    Launch Raid
+                                    STAKE 100 XLM & RAID
                                 </button>
                                 <button 
                                     onClick={onClose}
