@@ -7,7 +7,7 @@ import { StellarService } from '../services/stellarService';
 
 interface BattleArenaProps {
     refreshGame: () => void;
-    onToast?: (type: 'success' | 'error', msg: string) => void;
+    onToast?: (type: 'success' | 'error' | 'info', msg: string) => void;
     walletAddress: string | null;
     user: any;
     xlmBalance: string;
@@ -26,6 +26,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
     useEffect(() => {
         fetchOpponents();
     }, []);
+
     useEffect(() => {
         const checkCooldown = () => {
             const state = MockContract.getState();
@@ -38,8 +39,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
         checkCooldown();
         const interval = setInterval(checkCooldown, 1000);
         return () => clearInterval(interval);
-    }, [raiding, modalOpen]); // Check when raid finishes or modal opens
-
+    }, [raiding, modalOpen]); 
 
     const fetchOpponents = async () => {
         setLoading(true);
@@ -71,7 +71,6 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
         setModalOpen(true);
     };
 
-    
     const handleSkipCooldown = async () => {
         if (!walletAddress) {
             onToast?.('error', 'Connect Wallet to Skip');
@@ -79,7 +78,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
         }
         try {
             onToast?.('info', 'Signing Skip Transaction...');
-            await StellarService.deposit(walletAddress, "5"); // 5 XLM Cost
+            await StellarService.deposit(walletAddress, "5"); 
             MockContract.skipCooldown();
             setCooldown(0);
             onToast?.('success', 'Cooldown Skipped!');
@@ -88,23 +87,20 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
         }
     };
 
-        const handleLaunch = async () => {
+    const handleLaunch = async () => {
         if (!selectedOpponent) return;
         
-        // V3 Staking Check
         if (!walletAddress) {
             onToast?.('error', 'Connect Wallet to Stake');
             return;
         }
         
-        // Calculate Logic for Pre-Check (Visual only)
         const dps = ((user?.troops?.archers||0)*3) + ((user?.troops?.infantry||0)*5) + ((user?.troops?.giants||0)*7);
         const def = selectedOpponent.stats?.defense || 50;
         
-        if (dps <= def) {
-             // Optional Warning
-             // onToast('error', 'Commander! Our DPS is too low to breach!');
-             // We can let them fail if they want to lose 100 XLM... 
+        if (dps === 0) {
+             onToast?.('error', 'Recruit troops first! DPS is 0.');
+             return;
         }
 
         setRaiding(true);
@@ -115,16 +111,14 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
         addLog("🔗 INITIATING SECURE STAKE PROTOCOL...");
         
         try {
-            // 1. Stake
             await StellarService.deposit(walletAddress, "100");
             addLog("💰 STAKE LOCKED: 100 XLM");
             await new Promise(r => setTimeout(r, 800));
             
             addLog("🚀 LAUNCHING V3 ASSAULT UNITS...");
-            addLog(`⚔️ TOTAL ARMY DPS: ${dps}`);
+            addLog(`⚔️ TOTAL ARMY DPS: ${dps} vs DEF: ${def}`);
             await new Promise(r => setTimeout(r, 1000));
 
-            // 2. Execute Raid Math
             const targetName = selectedOpponent.username || 'Unknown';
             const result = await MockContract.raid(targetName, walletAddress, 0, selectedOpponent.stats);
 
@@ -138,8 +132,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
             }
             
             setBattleResult(result);
-            // Wait a moment before refreshing to show results
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 1500));
             refreshGame(); 
             
         } catch (e: any) {
@@ -190,7 +183,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                                 onClick={() => cooldown > 0 ? handleSkipCooldown() : initiateRaid(opp)}
                                 disabled={raiding || (user?.username === opp.username) }
                                 className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                            >{cooldown > 0 ? `⚡ SKIP (${cooldown}s) - 5 XLM` : "BATTLE"}</button>
+                            >{cooldown > 0 ? `⚡ SKIP (${cooldown}s) - 5 XLM` : "STAKE 100 XLM"}</button>
                         </div>
                     ))}
                 </div>
@@ -204,11 +197,11 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                     onClose={() => setModalOpen(false)}
                     onLaunch={handleLaunch}
                     isRaiding={raiding}
-                    attacker={{ name: user?.username || 'YOU', power: 100, unit: 'CYBER_UNIT' }}
+                    attacker={{ name: user?.username || 'YOU', power: 100, unit: 'V3_ARMY' }}
                     defender={{ 
                         name: selectedOpponent.username, 
                         defense: selectedOpponent.stats?.defense || 50, 
-                        unit: 'FORTRESS_V1' 
+                        unit: 'FORTRESS_V3' 
                     }}
                     logs={logs}
                     result={battleResult}

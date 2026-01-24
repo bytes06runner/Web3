@@ -3,7 +3,6 @@ import { StellarService } from './stellarService';
 
 const STORAGE_KEY = 'yield_raiders_state';
 
-
 interface BaseState {
     level: number;
     wallHp: number;
@@ -20,6 +19,7 @@ interface TroopQueue {
     giants: number;
     trainingUntil: number;
 }
+
 interface GameState {
     principal: number;
     commandTokens: number;
@@ -72,8 +72,7 @@ const INITIAL_STATE: GameState = {
         infantry: 0,
         giants: 0,
         trainingUntil: 0
-    },
-
+    }
 };
 
 export const MockContract = {
@@ -122,19 +121,18 @@ export const MockContract = {
             state.commandTokens += yieldAmount * 10;
             state.lastYieldTime = now;
             if (yieldAmount > 0.01) {
-                state.history.unshift(`Claimed Yield + ${(yieldAmount * 10).toFixed(2)} CMD`);
+                // state.history.unshift(`Claimed Yield + ${(yieldAmount * 10).toFixed(2)} CMD`);
             }
             MockContract.saveState(state);
         }
         return state;
     },
 
-    
-        trainTroops: (type: 'archers' | 'infantry' | 'giants') => {
+    // V3 Training
+    trainTroops: (type: 'archers' | 'infantry' | 'giants') => {
         const state = MockContract.getState();
         const troops = state.troops || { archers: 0, infantry: 0, giants: 0, trainingUntil: 0 };
         
-        // Limits & Costs
         const RULES = {
             archers: { cost: 5, limit: 4 },
             infantry: { cost: 10, limit: 3 },
@@ -144,18 +142,15 @@ export const MockContract = {
         const unit = RULES[type];
         if (!unit) throw new Error("Invalid Unit Type");
         
-        // 1. Check Unit Limit
         if ((troops[type] || 0) >= unit.limit) {
             throw new Error(`Max ${unit.limit} ${type} allowed!`);
         }
         
-        // 2. Check Capacity
         const usedCapacity = (troops.archers * 5) + (troops.infantry * 10) + (troops.giants * 20);
         if (usedCapacity + unit.cost > 100) {
             throw new Error(`Insufficient Capacity! (${usedCapacity}/100)`);
         }
         
-        // Train
         troops[type] = (troops[type] || 0) + 1;
         state.troops = troops;
         
@@ -164,9 +159,7 @@ export const MockContract = {
         return state;
     },
 
-
     refillStrength: () => {
-        // This simulates the paid transaction callback
         const state = MockContract.getState();
         state.stamina = 100;
         state.history.unshift("⚡ Strength Refilled (Paid).");
@@ -174,75 +167,77 @@ export const MockContract = {
         return state;
     },
     
-    recordSteps: (steps: number) => {
+    skipCooldown: () => {
         const state = MockContract.getState();
-        state.stepCount += steps;
-        if (steps >= 1000) state.streakDays += 1;
-        
-        const bonus = Math.floor(steps / 100);
-        if (bonus > 0) {
-            state.commandTokens += bonus;
-            state.defense += Math.floor(bonus / 2);
-            state.history.unshift(`Walked ${steps} steps! Earned ${bonus} CMD`);
-        }
-        state.lastStepDate = Date.now();
+        state.cooldownUntil = 0;
+        state.consecutiveWins = 0;
+        state.history.unshift("⏩ Cooldown Skipped (Paid).");
         MockContract.saveState(state);
         return state;
     },
 
-                        raid: async (targetName: string, userPublicKey: string, troopCount: number = 0, defenderStats: any = { defense: 50 }) => {
+    recordSteps: (steps: number) => {
+        const state = MockContract.getState();
+        state.stepCount += steps;
+        MockContract.saveState(state);
+        return state;
+    },
+
+    // V3 Raid Logic
+    raid: async (targetName: string, userPublicKey: string, troopCount: number = 0, defenderStats: any = { defense: 50 }) => {
         const state = MockContract.getState();
         const troops = state.troops || { archers: 0, infantry: 0, giants: 0 };
         
-        // DPS Calculation
         const dps = (troops.archers * 3) + (troops.infantry * 5) + (troops.giants * 7);
         const defenderDefense = defenderStats.defense || 50;
         
-        let logMsg = `⚔️ RAID (STAKED 100 XLM)
-Army DPS: ${dps} vs Defense: ${defenderDefense}`;
+        let logMsg = `⚔️ RAID (STAKED 100 XLM)\nArmy DPS: ${dps} vs Defense: ${defenderDefense}`;
         
         const success = dps > defenderDefense;
         let destruction = 0;
         let reward = 0;
+        let phase = "Wall"; // Fallback phase logic
         
+        // Pseudo-phase for visualization compatibility
+        if (dps > defenderDefense * 0.3) phase = "Army";
+        if (dps > defenderDefense * 0.8) phase = "Townhall";
+
         if (success) {
             const margin = dps - defenderDefense;
             destruction = Math.min(100, 50 + (margin * 5));
+            phase = "Townhall";
             
             const stakeRefund = Math.floor(100 * (destruction / 100));
             const loot = 20; 
             reward = stakeRefund + loot;
             
-            logMsg += `
-✅ VICTORY! Destruction: ${destruction.toFixed(0)}%`;
-            logMsg += `
-💰 RECOVERED: ${stakeRefund} XLM + LOOT: ${loot} XLM`;
+            logMsg += `\n✅ VICTORY! Destruction: ${destruction.toFixed(0)}%`;
+            logMsg += `\n💰 RECOVERED: ${stakeRefund} XLM + LOOT: ${loot} XLM`;
             
             state.consecutiveWins = (state.consecutiveWins || 0) + 1;
+            
+            if (state.consecutiveWins >= 5) {
+                state.cooldownUntil = Date.now() + 60000; // 1 min cooldown
+                logMsg += "\n(💤 Army Resting 60s)";
+            }
+
             state.commandTokens += 50; 
             state.yieldEarned += reward;
         } else {
-            logMsg += `
-❌ DEFEAT. Invaders wiped out.`;
-            logMsg += `
-💸 LOST STAKE: 100 XLM`;
+            logMsg += `\n❌ DEFEAT. Invaders wiped out.`;
+            logMsg += `\n💸 LOST STAKE: 100 XLM`;
             state.consecutiveWins = 0;
         }
         
-        // Consume Units
         state.troops = { archers: 0, infantry: 0, giants: 0, trainingUntil: 0 };
-        logMsg += `
-📉 Units Deployed & Consumed.`;
+        logMsg += `\n📉 Units Deployed & Consumed.`;
 
-        state.history.unshift(logMsg.split('
-')[0]);
+        state.history.unshift(logMsg.split('\n')[0]);
         MockContract.saveState(state);
         
-        return { success, reward, destruction, log: logMsg };
+        return { success, reward, destruction, log: logMsg, phase };
     },
 
-
-    
     upgradeDefense: () => {
         const state = MockContract.getState();
         state.defense += 5;
@@ -250,45 +245,7 @@ Army DPS: ${dps} vs Defense: ${defenderDefense}`;
         MockContract.saveState(state);
         return state;
     },
-    requestDrill: async (userPublicKey: string) => {
-         try {
-             await StellarService.createPaymentToBank(userPublicKey, "10");
-             const state = MockContract.getState();
-             state.history.unshift(`📚 Drill Requested. Staked 10 XLM.`);
-             MockContract.saveState(state);
-        
-             const QUESTIONS = [
-                { id: 1, q: "What consensus mechanism does Stellar use?", options: ["PoW", "PoS", "SCP", "PoH"], ans: "SCP" },
-                { id: 2, q: "What is the native token of Soroban?", options: ["ETH", "XLM", "SOL", "USDC"], ans: "XLM" },
-                { id: 3, q: "Which function authorizes a contract call?", options: ["require_auth", "check_sig", "validate", "sign"], ans: "require_auth" },
-            ];
-            return QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
-         } catch(e) {
-             throw new Error("Staking Failed. Cannot start drill.");
-         }
-    },
 
-    submitDrill: async (correct: boolean, userPublicKey: string) => {
-        const state = MockContract.getState();
-        if (correct) {
-            try {
-                await StellarService.payoutToUser(userPublicKey, "15");
-                state.history.unshift(`✅ Correct! Received 15 XLM (Stake + Reward)`);
-                state.defense += 5;
-                state.commandTokens += 50;
-            } catch(e) {
-                state.history.unshift(`❌ Reward Payout Failed`);
-            }
-        } else {
-            try {
-                await StellarService.createPaymentToBank(userPublicKey, "10");
-                state.stamina = Math.max(0, state.stamina - 5);
-                state.history.unshift(`❌ Wrong Answer! Penalty: Additional 10 XLM Paid.`);
-            } catch(e) {
-                state.history.unshift(`❌ Penalty Transaction Failed`);
-            }
-        }
-        MockContract.saveState(state);
-        return state;
-    }
+    requestDrill: async () => {},
+    submitDrill: async () => {}
 };

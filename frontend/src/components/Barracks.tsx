@@ -14,8 +14,6 @@ interface BarracksProps {
 }
 
 export const Barracks: React.FC<BarracksProps> = ({ troops, commandTokens, stamina, walletAddress, onTrain, onToast }) => {
-    
-    // Derived Calculations (archers 5, infantry 10, giants 20)
     const capacityUsed = ((troops?.archers || 0) * 5) + ((troops?.infantry || 0) * 10) + ((troops?.giants || 0) * 20);
     const maxCapacity = 100;
 
@@ -42,6 +40,7 @@ export const Barracks: React.FC<BarracksProps> = ({ troops, commandTokens, stami
         }
     };
 
+    // Calculate dynamic cost? No, fixed.
     const UNITS = [
         { id: 'archers', name: 'Cyber Archer', cost: 5, power: 3, limit: 4, icon: '🏹' },
         { id: 'infantry', name: 'Nano Infantry', cost: 10, power: 5, limit: 3, icon: '⚔️' },
@@ -56,7 +55,6 @@ export const Barracks: React.FC<BarracksProps> = ({ troops, commandTokens, stami
                 </h3>
             </div>
 
-            {/* Capacity Bar */}
             <div className="mb-2 flex justify-between text-xs text-gray-400">
                 <span>GARRISON CAPACITY</span>
                 <span>{capacityUsed} / {maxCapacity}</span>
@@ -73,7 +71,12 @@ export const Barracks: React.FC<BarracksProps> = ({ troops, commandTokens, stami
                     const count = troops?.[unit.id] || 0;
                     const isMax = count >= unit.limit;
                     const canAfford = (capacityUsed + unit.cost) <= maxCapacity;
-                    
+                    const btnClass = isMax 
+                        ? 'bg-green-500/20 text-green-400 cursor-default' 
+                        : !canAfford 
+                            ? 'bg-red-500/20 text-red-400 cursor-not-allowed' 
+                            : 'bg-blue-600 hover:bg-blue-500 text-white';
+
                     return (
                         <div key={unit.id} className="bg-white/5 hover:bg-white/10 p-4 rounded-xl border border-white/5 text-center relative group">
                             <div className="text-3xl mb-2">{unit.icon}</div>
@@ -91,7 +94,7 @@ export const Barracks: React.FC<BarracksProps> = ({ troops, commandTokens, stami
                             <button 
                                 onClick={() => handleTrain(unit.id as any)}
                                 disabled={isMax || !canAfford}
-                                className={`w-full py-2 rounded text-xs font-bold uppercase transition-all ${isMax ? 'bg-green-500/20 text-green-400 cursor-default' : !canAfford ? 'bg-red-500/20 text-red-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+                                className={`w-full py-2 rounded text-xs font-bold uppercase transition-all ${btnClass}`}
                             >
                                 {isMax ? 'MAXED' : !canAfford ? 'FULL' : 'TRAIN'}
                             </button>
@@ -100,7 +103,6 @@ export const Barracks: React.FC<BarracksProps> = ({ troops, commandTokens, stami
                 })}
             </div>
             
-            {/* Defense Upgrade Hook */}
             <div className="border-t border-white/10 pt-4">
                <button onClick={handleUpgradeDefense} className="w-full flex items-center justify-center gap-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 py-3 rounded-xl font-bold uppercase tracking-wider transition-all">
                    <Shield size={16} /> Upgrade Shield (+5 DEF) - 10 XLM

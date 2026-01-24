@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Horizon, Keypair, TransactionBuilder, Networks, Asset, Operation } from '@stellar/stellar-sdk';
 import { signTransaction } from '@stellar/freighter-api';
 
@@ -11,9 +10,6 @@ const GAME_BANK_SECRET = 'SC5ARIKNBFWASHXN2SJY2PZGXVPHEXTC6RYTHO63IB736DI4AM4TWF
 const bankKeypair = Keypair.fromSecret(GAME_BANK_SECRET);
 
 export class StellarService {
-  /**
-   * Fetches the XLM balance for a given public key.
-   */
   static async getBalance(publicKey: string): Promise<string> {
     try {
       const account = await server.loadAccount(publicKey);
@@ -27,10 +23,6 @@ export class StellarService {
     }
   }
 
-  /**
-   * Creates a transaction for the USER to sign, paying the Bank.
-   * Used for Penalties (Raid loss) or Entry Fees (Drills).
-   */
   static async createPaymentToBank(userPublicKey: string, amountXLM: string): Promise<any> {
       try {
           const account = await server.loadAccount(userPublicKey);
@@ -45,10 +37,9 @@ export class StellarService {
               .setTimeout(30)
               .build();
 
-          // Sign with Freighter
           const signedXDR = await signTransaction(transaction.toXDR(), 'TESTNET');
+          if (!signedXDR) throw new Error("User cancelled signature");
           
-          // Submit
           const tx = TransactionBuilder.fromXDR(signedXDR, Networks.TESTNET);
           const result = await server.submitTransaction(tx);
           return result;
@@ -58,14 +49,8 @@ export class StellarService {
       }
   }
 
-  /**
-   * Bank pays the winner (User).
-   * Used for Raid Wins or Drill Rewards.
-   * This is signed automatically by the backend (Bank Secret).
-   */
   static async payoutToUser(userPublicKey: string, amountXLM: string): Promise<any> {
       try {
-          // Verify bank has funds
           const bankAccount = await server.loadAccount(bankKeypair.publicKey());
           const fee = await server.fetchBaseFee();
 
@@ -79,70 +64,24 @@ export class StellarService {
               .build();
 
           transaction.sign(bankKeypair);
-          
-          const result = await server.submitTransaction(transaction);
-          return result;
+          return await server.submitTransaction(transaction);
       } catch(error) {
           console.error("Payout to User Failed:", error);
           throw error;
       }
   }
 
-  /**
-   * Triggers a real payment from User to Game Bank via Freighter.
-   * Returns: Transaction Hash if successful.
-   */
+  // V3 Methods
   static async deposit(userPublicKey: string, amountXLM: string): Promise<string> {
-      try {
-          // Verify user account exists
-          try {
-            await server.loadAccount(userPublicKey);
-          } catch(e) {
-             throw new Error("Account not found on Testnet. Please fund it with Friendbot.");
-          }
-
-          const fee = await server.fetchBaseFee();
-          const account = await server.loadAccount(userPublicKey);
-
-          const transaction = new TransactionBuilder(account, { fee: fee.toString(), networkPassphrase: Networks.TESTNET })
-              .addOperation(Operation.payment({
-                  destination: bankKeypair.publicKey(), // Game Bank
-                  asset: Asset.native(),
-                  amount: amountXLM
-              }))
-              .setTimeout(30)
-              .build();
-
-          // Sign with Freighter
-          const signedXDR = await signTransaction(transaction.toXDR(), 'TESTNET');
-          
-          if (!signedXDR) throw new Error("User denied transaction signature");
-
-          // Submit
-          const tx = TransactionBuilder.fromXDR(signedXDR, Networks.TESTNET);
-          const result = await server.submitTransaction(tx);
-          
-          console.log("Deposit Successful:", result.hash);
-          return result.hash;
-      } catch(error: any) {
-          console.error("Deposit Failed:", error);
-          throw new Error(error.message || "Deposit Transaction Failed");
-      }
+      const res = await this.createPaymentToBank(userPublicKey, amountXLM);
+      return res.hash;
   }
 
-
-  /**
-   * Stakes 100 XLM for a Raid.
-   */
   static async stakeRaid(userPublicKey: string): Promise<string> {
       return this.deposit(userPublicKey, "100");
   }
 
-  /**
-   * Upgrades Defense for cost.
-   */
   static async upgradeDefense(userPublicKey: string, cost: string): Promise<string> {
       return this.deposit(userPublicKey, cost);
   }
-
 }
