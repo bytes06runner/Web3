@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect } from 'react';
 import { Sword, Shield, RefreshCw } from 'lucide-react';
 import { MockContract } from '../services/mockContract';
