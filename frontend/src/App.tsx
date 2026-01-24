@@ -249,6 +249,7 @@ function App() {
                     walletAddress={walletAddress}
                     user={user}
                     xlmBalance={xlmBalance}
+                    troops={gameState.troops} /* CRITICAL FIX: Passing global troops state */
                 />
               </div>
               <div className="flex-1">
