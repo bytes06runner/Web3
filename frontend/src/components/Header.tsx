@@ -45,29 +45,62 @@ export const Header: React.FC<HeaderProps> = ({ balance, apy, username, onLogout
                          </div>
                     </div>
 
-                    {/* Center: GOLDEN TITLE EMBLEM */}
+                    {/* Center: SUPERCELL STYLE TITLE EMBLEM */}
                     <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 z-30">
-                        {/* The Plaque Container (Compact Badge) */}
-                        <div className="relative bg-gradient-to-b from-amber-700 via-yellow-900 to-amber-950 px-8 py-2 rounded-xl border-4 border-black shadow-[0_0_0_2px_#fbbf24,0_0_30px_rgba(0,0,0,0.9)] transform skew-x-[-5deg]">
+                        {/* The Plaque Container */}
+                        <div className="relative bg-gradient-to-b from-amber-800 via-yellow-950 to-amber-950 px-10 py-3 rounded-xl border-4 border-[#2a1a10] shadow-[0_0_0_2px_#fbbf24,0_0_40px_rgba(0,0,0,1)] transform skew-x-[-3deg]">
                             
                             {/* Inner Highlight Ring */}
-                            <div className="absolute inset-0 border-t border-yellow-400/50 rounded-lg pointer-events-none"></div>
+                            <div className="absolute inset-0 border-t border-yellow-400/30 rounded-lg pointer-events-none"></div>
 
-                            {/* Main Text: Super-Bold Gold Gradient with Heavy Stroke */}
-                            <h1 className="font-game text-3xl md:text-5xl tracking-widest leading-none text-center transform skew-x-[5deg]"
-                                style={{
-                                    background: 'linear-gradient(to bottom, #fff7ed 0%, #fcd34d 40%, #d97706 100%)',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    filter: 'drop-shadow(0 2px 0px rgba(0,0,0,1)) drop-shadow(0 4px 0px rgba(0,0,0,1))', // Heavy Block Shadow
-                                    WebkitTextStroke: '1.5px black', // Stroke
-                                }}
-                            >
-                                YIELD RAIDERS
-                            </h1>
-                            
-                            {/* "Black Light" Glow Effect */}
-                            <div className="absolute -inset-4 bg-black/40 blur-xl -z-10 rounded-full"></div>
+                            {/* TEXT COMPOSITION ROOT */}
+                            <div className="relative flex justify-center items-center h-12 w-[300px] md:w-[400px]">
+                                
+                                {/* Layer 1: MASSIVE BLACK OUTLINE (The Sticker Effect) */}
+                                <h1 className="absolute inset-0 font-game text-3xl md:text-5xl tracking-widest leading-none text-center transform skew-x-[3deg] z-10"
+                                    style={{
+                                        WebkitTextStroke: '12px black', 
+                                        color: 'black',
+                                        filter: 'drop-shadow(0 5px 5px rgba(0,0,0,0.8))'
+                                    }}
+                                >
+                                    YIELD RAIDERS
+                                </h1>
+
+                                {/* Layer 2: INNER BROWN STROKE (Definition) */}
+                                <h1 className="absolute inset-0 font-game text-3xl md:text-5xl tracking-widest leading-none text-center transform skew-x-[3deg] z-20"
+                                    style={{
+                                        WebkitTextStroke: '4px #421C02', // Dark Brown Stroke
+                                        color: '#421C02',
+                                    }}
+                                >
+                                    YIELD RAIDERS
+                                </h1>
+
+                                {/* Layer 3: GOLD GRADIENT FILL (The shiny part) */}
+                                <h1 className="absolute inset-0 font-game text-3xl md:text-5xl tracking-widest leading-none text-center transform skew-x-[3deg] z-30"
+                                    style={{
+                                        background: 'linear-gradient(to bottom, #FFF200 0%, #F7931E 50%, #C1272D 100%)',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                    }}
+                                >
+                                    YIELD RAIDERS
+                                </h1>
+                                
+                                {/* Layer 4: TOP HIGHLIGHT (Bevel Effect) */}
+                                <h1 className="absolute inset-0 font-game text-3xl md:text-5xl tracking-widest leading-none text-center transform skew-x-[3deg] z-30 pointer-events-none opacity-80"
+                                     style={{
+                                        backgroundImage: 'linear-gradient(to bottom, white 0%, transparent 40%, transparent 100%)',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        maskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)' // Only top part
+                                    }}
+                                >
+                                    YIELD RAIDERS
+                                </h1>
+
+                            </div>
                         </div>
                     </div>
 
@@ -88,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({ balance, apy, username, onLogout
                         <div className="w-1 h-8 bg-stone-600 border-x border-black shadow-lg"></div>
                         <div className="w-1 h-8 bg-stone-600 border-x border-black shadow-lg"></div>
                     </div>
-                    {/* Dog Tag Plate */}
+                    {/* Plate */}
                     <div className="bg-slate-800 border-2 border-slate-500 rounded px-3 py-1.5 shadow-xl flex items-center gap-2 -mt-1 transform group-hover:rotate-2 transition-transform origin-top">
                         <ShieldAlert size={14} className="text-green-500" />
                         <div className="flex flex-col">
@@ -108,7 +141,6 @@ export const Header: React.FC<HeaderProps> = ({ balance, apy, username, onLogout
                             <span className="relative z-10 font-game text-white tracking-widest text-xs flex items-center gap-2">
                                 <Wifi size={14} className="animate-pulse" /> LINK WALLET
                             </span>
-                            {/* Mana Fluid */}
                             <div className="absolute bottom-0 inset-x-0 h-1/2 bg-blue-500/30 blur-sm group-hover:h-full transition-all duration-500"></div>
                         </button>
                      ) : (
