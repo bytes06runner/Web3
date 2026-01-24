@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Wallet } from 'lucide-react';
 import { MockContract } from '../services/mockContract';
 import { BattleInterface } from './BattleInterface';
 import { StellarService } from '../services/stellarService';
-import { FreighterTransaction } from './FreighterTransaction';
+// Removed: FreighterTransaction import (We use real wallet now)
 
 interface BattleArenaProps {
     refreshGame: () => void;
@@ -20,14 +20,13 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
     
     // UI Logic
     const [modalOpen, setModalOpen] = useState(false);
-    const [detailsOpen, setDetailsOpen] = useState(false); // New state for initial details view if needed, but we used modalOpen for everything so far.
-    const [freighterOpen, setFreighterOpen] = useState(false);
-
     const [selectedOpponent, setSelectedOpponent] = useState<any>(null);
     const [raiding, setRaiding] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
     const [battleResult, setBattleResult] = useState<any>(null);
     const [cooldown, setCooldown] = useState(0);
+    const [awaitingWallet, setAwaitingWallet] = useState(false); // New state for wallet interaction
+
     const currentDps = ((troops?.archers||0)*3) + ((troops?.infantry||0)*5) + ((troops?.giants||0)*7);
 
     useEffect(() => { fetchOpponents(); }, []);
@@ -63,27 +62,52 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
         setLogs([]);
         setBattleResult(null);
         setModalOpen(true);
+        setAwaitingWallet(false);
     };
 
-    // Step 2: User Clicks "RAID (100 XLM)" -> Open Freighter
-    const triggerTransaction = () => {
+    // Step 2: Trigger REAL Transactions via Freighter
+    const triggerRealTransaction = async () => {
+        if (!walletAddress) return;
+        
+        // 1. Balance Check (Soft check, real fail happens on chain if insufficient)
         if (parseFloat(xlmBalance || '0') < 100) {
             onToast?.('error', 'Insufficient Balance! Need 100 XLM.');
             return;
         }
-        setFreighterOpen(true);
+
+        try {
+            setAwaitingWallet(true);
+            onToast?.('info', 'Please sign the transaction in Freighter...');
+            
+            // 2. Call Stellar Service (Triggers Extension)
+            // This promise resolves only when user signs and tx is submitted
+            const txHash = await StellarService.stakeRaid(walletAddress);
+            
+            if (txHash) {
+                onToast?.('success', 'Stake Confirmed on Ledger!');
+                setAwaitingWallet(false);
+                executeRaidLogic(); // Proceed to game logic
+            }
+        } catch (error: any) {
+            console.error("Raid Stake Error:", error);
+            setAwaitingWallet(false);
+            if (error.message?.includes('cancelled')) {
+                onToast?.('info', 'Transaction Cancelled');
+            } else {
+                onToast?.('error', 'Stake Transaction Failed. Check console.');
+            }
+        }
     };
 
-    // Step 3: Transaction Confirmed -> Execute Raid Logic
-    const handleLaunch = async () => {
-        setFreighterOpen(false); // Close transaction modal
+    // Step 3: Execute Raid Logic (Visuals + Mock Contract Calculation)
+    const executeRaidLogic = async () => {
         setRaiding(true);
-        setLogs(['initiating_handshake...', 'validating_stake -100 XLM...', 'connecting_to_node...']);
-
-        // Deduck Stake Immediately (Visual only for mock)
-        MockContract.deposit(-100); 
-        refreshGame(); // Update balance ui
+        setLogs(['✅ STAKE CONFIRMED (100 XLM)', 'initiating_handshake...', 'connecting_to_node...']);
         
+        // Update mock balance visual
+        MockContract.deposit(-100); 
+        refreshGame();
+
         // Artificial delay for tension
         setTimeout(async () => {
             try {
@@ -95,10 +119,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                     { defense: selectedOpponent?.stats?.defense || 50 }
                 );
 
-                // Stream Logs one by one for effect? Or just dump them.
-                // The mock returns a big log string. We split it.
                 const logLines = result.log.split('\n');
-                
                 let currentLine = 0;
                 const interval = setInterval(() => {
                     if (currentLine >= logLines.length) {
@@ -110,13 +131,13 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                         setLogs(prev => [...prev, logLines[currentLine]]);
                         currentLine++;
                     }
-                }, 800); // Slow log scroll
+                }, 800); 
 
             } catch (e: any) {
                 setLogs(prev => [...prev, `ERROR: ${e.message}`]);
                 setRaiding(false);
             }
-        }, 1500); 
+        }, 1000); 
     };
 
     const handleSkipCooldown = async () => {
@@ -133,15 +154,6 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
 
     return (
         <>
-            {/* Freighter Simulator Modal */}
-            <FreighterTransaction 
-                isOpen={freighterOpen}
-                amount="100"
-                recipient="YieldRaiders_Contract"
-                onConfirm={handleLaunch}
-                onCancel={() => setFreighterOpen(false)}
-            />
-
             {/* List View */}
             <div className="parchment-scroll relative w-full aspect-[3/4] max-h-[500px] flex flex-col p-[12%] pb-[15%] filter drop-shadow-xl">
                  <div className="flex items-center justify-between mb-2 border-b-2 border-amber-950/20 pb-2">
@@ -189,20 +201,36 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                 </div>
             </div>
 
-            {/* Battle Interface Modal */}
+            {/* Battle Interface Modal w/ Wallet Awaiting State */}
             {selectedOpponent && (
-                <BattleInterface 
-                    isOpen={modalOpen}
-                    balance={xlmBalance}
-                    topCommanders={opponents} 
-                    onClose={() => setModalOpen(false)}
-                    onLaunch={triggerTransaction} // Now triggers Freighter First!
-                    isRaiding={raiding}
-                    attacker={{ name: user?.username || 'YOU', power: currentDps, unit: 'V3_ARMY' }}
-                    defender={{ name: selectedOpponent.username, defense: selectedOpponent.stats?.defense || 50, unit: 'FORTRESS_V3' }}
-                    logs={logs}
-                    result={battleResult}
-                />
+                <div className="relative z-50">
+                    <BattleInterface 
+                        isOpen={modalOpen}
+                        balance={xlmBalance}
+                        topCommanders={opponents} 
+                        onClose={() => setModalOpen(false)}
+                        onLaunch={triggerRealTransaction} // Triggers Real Freighter
+                        isRaiding={raiding}
+                        attacker={{ name: user?.username || 'YOU', power: currentDps, unit: 'V3_ARMY' }}
+                        defender={{ name: selectedOpponent.username, defense: selectedOpponent.stats?.defense || 50, unit: 'FORTRESS_V3' }}
+                        logs={logs}
+                        result={battleResult}
+                    />
+                    
+                    {/* Wallet Awaiting Overlay */}
+                    {awaitingWallet && modalOpen && (
+                        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
+                            <div className="bg-stone-900 border-2 border-amber-500 rounded-xl p-6 flex flex-col items-center animate-bounce-slow">
+                                <Wallet size={48} className="text-amber-500 mb-4 animate-pulse" />
+                                <h3 className="text-white font-game text-xl mb-2">CHECK YOUR WALLET</h3>
+                                <p className="text-stone-400 text-sm mb-4">Please sign the transaction in Freighter</p>
+                                <div className="h-1 w-32 bg-stone-800 rounded-full overflow-hidden">
+                                     <div className="h-full bg-amber-500 animate-progress"></div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             )}
         </>
     );
