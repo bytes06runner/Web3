@@ -18,6 +18,8 @@ interface GameState {
     troopCount: number;
     troopLevel: number;
     capacity: number;
+    consecutiveWins: number;
+    cooldownUntil: number;
 }
 
 const INITIAL_STATE: GameState = {
@@ -34,7 +36,9 @@ const INITIAL_STATE: GameState = {
     wallHp: 100,
     troopCount: 50,
     troopLevel: 1,
-    capacity: 100
+    capacity: 100,
+    consecutiveWins: 0,
+    cooldownUntil: 0
 };
 
 export const MockContract = {
@@ -108,6 +112,13 @@ export const MockContract = {
 
                 raid: async (targetName: string, userPublicKey: string, troopCount: number = 10, defenderStats: any = { defense: 50, unit: 'FORTRESS_V1' }) => {
         const state = MockContract.getState();
+        // --- COOLDOWN CHECK ---
+        const now = Date.now();
+        if (state.cooldownUntil && state.cooldownUntil > now) {
+            const remaining = Math.ceil((state.cooldownUntil - now) / 1000);
+            throw new Error(`Army Resting! Cooldown: ${remaining}s`);
+        }
+
         
         // --- STAMINA CHECK ---
         const STAMINA_COST = 10;
@@ -174,6 +185,12 @@ export const MockContract = {
         let reward = 0;
 
         if (success) {
+            state.consecutiveWins = (state.consecutiveWins || 0) + 1;
+            if (state.consecutiveWins >= 5) {
+                state.cooldownUntil = Date.now() + 10000;
+                state.consecutiveWins = 0;
+                logMsg += " (💤 Army Resting 10s)";
+            }
             // Victory
             const margin = winChance - roll; 
             
@@ -193,6 +210,7 @@ export const MockContract = {
                  logMsg = `⚔️ Raid SUCCESS! ${phaseMsg}`;
             }
         } else {
+            state.consecutiveWins = 0;
             destruction = Math.floor(Math.random() * 10); 
             logMsg = `🛡️ Raid FAILED. ${phaseMsg}`;
         }

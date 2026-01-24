@@ -19,10 +19,25 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
     const [raiding, setRaiding] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
     const [battleResult, setBattleResult] = useState<any>(null);
+    const [cooldown, setCooldown] = useState(0);
 
     useEffect(() => {
         fetchOpponents();
     }, []);
+    useEffect(() => {
+        const checkCooldown = () => {
+            const state = MockContract.getState();
+            if (state.cooldownUntil && state.cooldownUntil > Date.now()) {
+                setCooldown(Math.ceil((state.cooldownUntil - Date.now()) / 1000));
+            } else {
+                setCooldown(0);
+            }
+        };
+        checkCooldown();
+        const interval = setInterval(checkCooldown, 1000);
+        return () => clearInterval(interval);
+    }, [raiding, modalOpen]); // Check when raid finishes or modal opens
+
 
     const fetchOpponents = async () => {
         setLoading(true);
@@ -157,11 +172,9 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
 
                             <button
                                 onClick={() => initiateRaid(opp)}
-                                disabled={raiding || (user?.username === opp.username)}
+                                disabled={raiding || (user?.username === opp.username) || cooldown > 0}
                                 className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                            >
-                                BATTLE
-                            </button>
+                            >{cooldown > 0 ? `REST ${cooldown}s` : "BATTLE"}</button>
                         </div>
                     ))}
                 </div>

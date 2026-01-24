@@ -87,4 +87,47 @@ export class StellarService {
           throw error;
       }
   }
+
+  /**
+   * Triggers a real payment from User to Game Bank via Freighter.
+   * Returns: Transaction Hash if successful.
+   */
+  static async deposit(userPublicKey: string, amountXLM: string): Promise<string> {
+      try {
+          // Verify user account exists
+          try {
+            await server.loadAccount(userPublicKey);
+          } catch(e) {
+             throw new Error("Account not found on Testnet. Please fund it with Friendbot.");
+          }
+
+          const fee = await server.fetchBaseFee();
+          const account = await server.loadAccount(userPublicKey);
+
+          const transaction = new TransactionBuilder(account, { fee: fee.toString(), networkPassphrase: Networks.TESTNET })
+              .addOperation(Operation.payment({
+                  destination: bankKeypair.publicKey(), // Game Bank
+                  asset: Asset.native(),
+                  amount: amountXLM
+              }))
+              .setTimeout(30)
+              .build();
+
+          // Sign with Freighter
+          const signedXDR = await signTransaction(transaction.toXDR(), 'TESTNET');
+          
+          if (!signedXDR) throw new Error("User denied transaction signature");
+
+          // Submit
+          const tx = TransactionBuilder.fromXDR(signedXDR, Networks.TESTNET);
+          const result = await server.submitTransaction(tx);
+          
+          console.log("Deposit Successful:", result.hash);
+          return result.hash;
+      } catch(error: any) {
+          console.error("Deposit Failed:", error);
+          throw new Error(error.message || "Deposit Transaction Failed");
+      }
+  }
+
 }

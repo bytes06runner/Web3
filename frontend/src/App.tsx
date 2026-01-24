@@ -122,14 +122,28 @@ function App() {
     return () => clearInterval(interval);
   }, [view, fetchUserData]);
 
-  const handleDeposit = () => {
+  const handleDeposit = async () => {
+    if (!walletAddress) {
+        addToast('error', 'Connect Wallet first!');
+        return;
+    }
     setIsDepositing(true);
-    setTimeout(() => {
-      MockContract.deposit(100);
-      refreshGame();
-      setIsDepositing(false);
-      addToast('success', 'Deposit Successful! + USDC');
-    }, 1000);
+    try {
+        addToast('info', 'Please sign the transaction in Freighter...');
+        const txHash = await StellarService.deposit(walletAddress, "100"); // 100 XLM Deposit
+        
+        // Mock Contract update (reflecting on-chain state)
+        // In a full indexer setup, we would wait for backend to see tx.
+        // Here we trust our own submission for immediate UI feedback.
+        MockContract.deposit(100); 
+        refreshGame();
+        
+        addToast('success', `Deposit Confirmed! TX: ${txHash.substring(0, 8)}...`);
+    } catch (e: any) {
+        addToast('error', e.message || 'Deposit Failed');
+    } finally {
+        setIsDepositing(false);
+    }
   };
 
   if (view === 'login') {
