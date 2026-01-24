@@ -19,6 +19,7 @@
   "homepage": "https://github.com/bytes06runner/Web3#readme",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@stellar/freighter-api": "^6.0.1",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
