@@ -73,7 +73,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user }: Battl
             // Visual delay for "Breaching"
             await new Promise(r => setTimeout(r, 1500));
             
-            const result = await MockContract.raid(targetName, walletAddress!);
+            const result = await MockContract.raid(targetName, walletAddress!, 10, selectedOpponent.stats);
 
             if (result.phase === 'Breach' && !result.success) {
                  addLog("❌ WARNING: WALL BREACH FAILED.");
@@ -156,7 +156,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user }: Battl
 
                             <button
                                 onClick={() => initiateRaid(opp)}
-                                disabled={raiding}
+                                disabled={raiding || (user?.username === opp.username)}
                                 className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2"
                             >
                                 BATTLE

@@ -97,89 +97,79 @@ export const MockContract = {
         return state;
     },
 
-    raid: async (targetName: string, userPublicKey: string, troopCount: number = 10) => {
+        raid: async (targetName: string, userPublicKey: string, troopCount: number = 10, defenderStats: any = { defense: 50 }) => {
         const state = MockContract.getState();
         
-        const TROOP_DMG = 5;
-        const TROOP_STA = 20;
-        
+        const TROOP_ATK = 15;
+        const totalAttack = troopCount * TROOP_ATK;
+        const defensePower = (defenderStats.defense || 50) * 1.5; 
+
+        // Initial Stamina/Troop Check
         if (state.troopCount < troopCount) {
              throw new Error("Not enough troops in garrison!");
         }
 
-        const totalPotential = troopCount * TROOP_STA * TROOP_DMG;
-        const wallHp = state.wallHp || 100; 
+        // --- PROBABILITY LOGIC ---
+        // Base 50% chance
+        // Adjust by (Attack - Defense) / Scale
+        // If Attack = 150, Defense = 75 (High Advantage) -> +0.3 -> 80% Win
+        // If Attack = 150, Defense = 300 (High Disadvantage) -> -0.3 -> 20% Win
+        
+        const diff = totalAttack - defensePower;
+        const scale = Math.max(totalAttack, defensePower) || 1;
+        let winChance = 0.5 + (diff / (scale * 2)); 
+        
+        // Clamp 10% - 90%
+        winChance = Math.max(0.1, Math.min(0.9, winChance));
+        
+        const roll = Math.random();
+        let success = roll < winChance;
         
         let destruction = 0;
-        let success = false;
-        let reward = 0;
+        let phase = "Ambush"; // Simplified for now
         let logMsg = "";
-        let phase = "Breach";
+        let reward = 0;
 
-        // --- PHASE 1: BREACH ---
-        if (totalPotential < wallHp) {
-             destruction = 0;
-             success = false;
-             logMsg = `🛡️ Raid on ${targetName} BLOCKED by Wall. 0% Destruction.`;
+        if (success) {
+            // Victory
+            // Calculate destruction based on margin
+            const margin = winChance - roll; // Higher margin = more destruction
+            if (margin > 0.3) destruction = 100;
+            else if (margin > 0.1) destruction = 50;
+            else destruction = 30;
+
+            logMsg = `⚔️ Raid on ${targetName} SUCCESS! (Chance: ${(winChance*100).toFixed(0)}%) - ${destruction}% Destruction`;
         } else {
-             destruction = 30;
-             phase = "Ambush";
-             
-             const staminaConsumed = Math.ceil(wallHp / TROOP_DMG);
-             const totalStaminaPool = troopCount * TROOP_STA;
-             let remainingStamina = totalStaminaPool - staminaConsumed;
-             
-             if (remainingStamina <= 0) {
-                 logMsg = `⚠️ Wall Breached (30%), but troops exhausted!`;
-                 success = true; 
-             } else {
-                 // --- PHASE 2: AMBUSH ---
-                 const DEF_TROOPS = 10; 
-                 const defenderPower = DEF_TROOPS * TROOP_DMG * TROOP_STA;
-                 
-                 const attackerPower = remainingStamina * TROOP_DMG;
-                 
-                 if (attackerPower > defenderPower) {
-                      destruction = (attackerPower > defenderPower * 1.5) ? 100 : 50;
-                      success = true;
-                      logMsg = `⚔️ Raid on ${targetName} VICTORY! (${destruction}% Destruction)`;
-                 } else {
-                      destruction = 30; 
-                      success = true; 
-                      logMsg = `⚠️ Wall Breached, but Ambush repelled!`;
-                 }
-             }
+            destruction = 0;
+            logMsg = `🛡️ Raid on ${targetName} FAILED. Defense held strong. (Chance: ${(winChance*100).toFixed(0)}%)`;
         }
         
         let payoutPct = 0;
-        if (destruction >= 100) payoutPct = 0.9;
-        else if (destruction >= 50) payoutPct = 0.5;
-        else if (destruction >= 30) payoutPct = 0.2;
+        if (destruction >= 100) payoutPct = 90; // 90 XLM
+        else if (destruction >= 50) payoutPct = 50;
+        else if (destruction >= 30) payoutPct = 20;
         
-        const POOL = 500;
-        reward = Math.floor(POOL * payoutPct);
+        reward = payoutPct; // Simple 1:1 for now or pool based
         
         if (success && reward > 0) {
-             state.history.unshift(logMsg + ` Payout: ${reward} XLM`);
              try {
                 // await StellarService.payoutToUser(userPublicKey, reward.toString());
-                state.commandTokens += reward; 
-                state.history.unshift(`✅ Payout Received! +${reward} XLM`);
+                state.commandTokens += reward * 10;
+                state.yieldEarned += reward; // Simulate XLM gain in yield tracker too? Or separate.
+                state.history.unshift(`✅ Raid Victory! Looted ${reward} XLM`);
              } catch(e) {
-                 state.history.unshift(`❌ Payout Tx Simulated Failed`);
+                 state.history.unshift(`❌ Payout Simulated Failed`);
              }
-        } else {
-             state.history.unshift(logMsg);
         }
         
-        if (destruction === 100) state.troopCount -= Math.floor(troopCount * 0.1);
-        else if (destruction >= 30) state.troopCount -= Math.floor(troopCount * 0.5);
-        else state.troopCount -= Math.floor(troopCount * 0.8); 
-        
-        state.troopCount = Math.max(0, state.troopCount);
+        state.history.unshift(logMsg);
 
+        // Deduct Troops
+        const lossRate = success ? 0.1 : 0.4;
+        state.troopCount = Math.max(0, Math.floor(state.troopCount * (1 - lossRate)));
+        
         MockContract.saveState(state);
-        return { success, reward, destruction, phase };
+        return { success, reward, destruction, phase, log: logMsg };
     },
 
     requestDrill: async (userPublicKey: string) => {

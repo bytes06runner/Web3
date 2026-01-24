@@ -2,7 +2,7 @@ import { Shield, TrendingUp, Activity, Flame } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
 interface DashboardProps {
-    balance: number;
+    balance: number | string;
     capacity: number;
     commandTokens: number;
     yieldEarned: number;
@@ -34,7 +34,7 @@ export function Dashboard({ balance, capacity, defense, stamina, streakDays, cla
                 
                 <h2 className="text-cyan-400 text-xs font-bold tracking-[0.2em] uppercase mb-1">Vault Status // Online</h2>
                 <div className="text-5xl font-bold text-white mb-2 flex items-baseline gap-2 font-mono">
-                    ${balance.toFixed(2)}
+                    {typeof balance === 'string' ? balance : balance.toFixed(2)} XLM
                     <span className="text-xs font-normal text-green-400 flex items-center gap-1 bg-green-900/20 px-2 py-1 rounded border border-green-900/50">
                         <TrendingUp size={10} /> +5% APY
                     </span>

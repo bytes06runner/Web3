@@ -215,7 +215,7 @@ function App() {
             </div>
 
             <Dashboard
-              balance={user?.balance || gameState.principal}
+              balance={xlmBalance}
               capacity={user?.capacity || 100}
               commandTokens={gameState.commandTokens}
               yieldEarned={gameState.yieldEarned}
