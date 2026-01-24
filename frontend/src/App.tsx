@@ -75,6 +75,7 @@ function App() {
       const numericBalance = parseFloat(balance);
       if (!isNaN(numericBalance)) {
           MockContract.setPrincipal(numericBalance);
+          if (user?.capacity) MockContract.setCapacity(user.capacity);
           setGameState(MockContract.getState());
       }
 

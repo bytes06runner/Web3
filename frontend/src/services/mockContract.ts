@@ -17,6 +17,7 @@ interface GameState {
     wallHp: number;
     troopCount: number;
     troopLevel: number;
+    capacity: number;
 }
 
 const INITIAL_STATE: GameState = {
@@ -32,7 +33,8 @@ const INITIAL_STATE: GameState = {
     lastStepDate: 0,
     wallHp: 100,
     troopCount: 50,
-    troopLevel: 1
+    troopLevel: 1,
+    capacity: 100
 };
 
 export const MockContract = {
@@ -43,6 +45,13 @@ export const MockContract = {
 
     saveState: (state: GameState) => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    },
+
+    setCapacity: (amount: number) => {
+        const state = MockContract.getState();
+        state.capacity = amount || 100;
+        MockContract.saveState(state);
+        return state;
     },
 
     setPrincipal: (amount: number) => {
@@ -97,7 +106,7 @@ export const MockContract = {
         return state;
     },
 
-            raid: async (targetName: string, userPublicKey: string, troopCount: number = 10, defenderStats: any = { defense: 50, unit: 'FORTRESS_V1' }) => {
+                raid: async (targetName: string, userPublicKey: string, troopCount: number = 10, defenderStats: any = { defense: 50, unit: 'FORTRESS_V1' }) => {
         const state = MockContract.getState();
         
         // --- STAMINA CHECK ---
@@ -107,69 +116,85 @@ export const MockContract = {
         }
         state.stamina -= STAMINA_COST;
         
+        // --- CAPACITY RATIO LOGIC ---
+        const capacity = state.capacity || 100;
+        const staminaRatio = state.stamina / capacity;
+        
         const TROOP_ATK = 15;
         let totalAttack = troopCount * TROOP_ATK;
         const defensePower = (defenderStats.defense || 50) * 1.5; 
 
         // --- UNIT ADVANTAGE SYSTEM ---
-        // CYBER_UNIT > FORTRESS_V1 > STEALTH_OPS > CYBER_UNIT
-        const myUnit = 'CYBER_UNIT'; // Default for now
+        const myUnit = 'CYBER_UNIT'; 
         const defUnit = defenderStats.unit || 'FORTRESS_V1';
-        
         let advantageMsg = "";
         let advantageMult = 1.0;
 
         if (myUnit === 'CYBER_UNIT' && defUnit === 'FORTRESS_V1') {
             advantageMult = 1.25;
-            advantageMsg = "⚡ UNIT ADVANTAGE: Cyber Unit counters Fortress!";
+            advantageMsg = "⚡ UNIT ADVANTAGE";
         } else if (defUnit === 'CYBER_UNIT') { 
-            // If we are fighting a cyber unit (mirror), no advantage
             advantageMult = 1.0;
         }
 
         totalAttack = totalAttack * advantageMult;
 
-        // Low Stamina Penalty
-        if (state.stamina < 20) {
-            totalAttack *= 0.5;
-            advantageMsg += " (⚠️ Low Stamina: Attack Halved)";
-        }
+        // --- RATIO PHASE MODIFIERS ---
+        let winChanceMod = 0;
+        let phase = "Ambush";
+        let phaseMsg = "";
 
+        if (staminaRatio < 0.70) {
+            winChanceMod -= 0.3; // 30% penalty
+            phaseMsg = "⚠️ PHASE 1 STRUGGLE (Low Energy)";
+            phase = "Breach";
+        } else if (staminaRatio > 0.90) {
+             winChanceMod += 0.2; // 20% bonus
+             phaseMsg = "🚀 PHASE 2 BOOST (High Energy)";
+             phase = "Ambush";
+        } 
+        
         // --- CRITICAL HIT ---
-        const isCrit = Math.random() < 0.10; // 10% Chance
+        const isCrit = Math.random() < 0.10; 
         
         // --- PROBABILITY LOGIC ---
         const diff = totalAttack - defensePower;
         const scale = Math.max(totalAttack, defensePower) || 1;
         let winChance = 0.5 + (diff / (scale * 2)); 
         
+        // Apply Ratio Modifier
+        winChance += winChanceMod;
+        
         winChance = Math.max(0.1, Math.min(0.9, winChance));
         
         const roll = Math.random();
-        // Crit guarantees win
         let success = isCrit || (roll < winChance);
-        
         let destruction = 0;
-        let phase = "Ambush"; 
         let logMsg = "";
         let reward = 0;
 
         if (success) {
             // Victory
             const margin = winChance - roll; 
-            if (isCrit) {
+            
+            // PHASE 3 CHECK
+            if (staminaRatio > 0.97) {
+                 destruction = 100;
+                 reward += 100; // Bonus
+                 logMsg = `💎 PHASE 3 UNLOCKED: VAULT CRACKED! (+100 XLM) `;
+                 phase = "Vault";
+            } else if (isCrit) {
                 destruction = 100;
-                logMsg = `💥 CRITICAL HIT! DEFENSE BYPASSED! 100% DESTRUCTION!`;
+                logMsg = `💥 CRITICAL HIT! 100% DESTRUCTION!`;
             } else {
                  if (margin > 0.3) destruction = 100;
                  else if (margin > 0.1) destruction = 75;
                  else destruction = 40;
-                 
-                 logMsg = `⚔️ Raid SUCCESS! ${advantageMsg} (Chance: ${(winChance*100).toFixed(0)}%) - ${destruction}% Dmg`;
+                 logMsg = `⚔️ Raid SUCCESS! ${phaseMsg}`;
             }
         } else {
-            destruction = Math.floor(Math.random() * 10); // Minimal scratch damage
-            logMsg = `🛡️ Raid FAILED. Defense held. ${advantageMsg} (Chance: ${(winChance*100).toFixed(0)}%)`;
+            destruction = Math.floor(Math.random() * 10); 
+            logMsg = `🛡️ Raid FAILED. ${phaseMsg}`;
         }
         
         let payoutPct = 0;
@@ -177,7 +202,7 @@ export const MockContract = {
         else if (destruction >= 75) payoutPct = 50;
         else if (destruction >= 40) payoutPct = 25;
         
-        reward = payoutPct; 
+        reward += payoutPct; 
         
         if (success && reward > 0) {
              try {
