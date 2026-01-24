@@ -56,10 +56,10 @@ export const Header: React.FC<HeaderProps> = ({ balance, apy, username, onLogout
                             {/* TEXT COMPOSITION ROOT */}
                             <div className="relative flex justify-center items-center h-12 w-[300px] md:w-[400px]">
                                 
-                                {/* Layer 1: MASSIVE BLACK OUTLINE (The Sticker Effect) */}
+                                {/* Layer 1: MASSIVE BLACK OUTLINE (Sticker) */}
                                 <h1 className="absolute inset-0 font-game text-3xl md:text-5xl tracking-widest leading-none text-center transform skew-x-[3deg] z-10"
                                     style={{
-                                        WebkitTextStroke: '12px black', 
+                                        WebkitTextStroke: '10px black', 
                                         color: 'black',
                                         filter: 'drop-shadow(0 5px 5px rgba(0,0,0,0.8))'
                                     }}
@@ -67,34 +67,24 @@ export const Header: React.FC<HeaderProps> = ({ balance, apy, username, onLogout
                                     YIELD RAIDERS
                                 </h1>
 
-                                {/* Layer 2: INNER BROWN STROKE (Definition) */}
-                                <h1 className="absolute inset-0 font-game text-3xl md:text-5xl tracking-widest leading-none text-center transform skew-x-[3deg] z-20"
-                                    style={{
-                                        WebkitTextStroke: '4px #421C02', // Dark Brown Stroke
-                                        color: '#421C02',
-                                    }}
-                                >
-                                    YIELD RAIDERS
-                                </h1>
-
-                                {/* Layer 3: GOLD GRADIENT FILL (The shiny part) */}
+                                {/* Layer 2: BRIGHT GOLD FILL */}
                                 <h1 className="absolute inset-0 font-game text-3xl md:text-5xl tracking-widest leading-none text-center transform skew-x-[3deg] z-30"
                                     style={{
-                                        background: 'linear-gradient(to bottom, #FFF200 0%, #F7931E 50%, #C1272D 100%)',
+                                        background: 'linear-gradient(to bottom, #FFFF00 20%, #FFD700 50%, #FFA500 100%)', // BRIGHT YELLOW -> GOLD -> ORANGE
                                         WebkitBackgroundClip: 'text',
                                         WebkitTextFillColor: 'transparent',
+                                        filter: 'drop-shadow(0 2px 0 rgba(0,0,0,0.5))'
                                     }}
                                 >
                                     YIELD RAIDERS
                                 </h1>
                                 
-                                {/* Layer 4: TOP HIGHLIGHT (Bevel Effect) */}
-                                <h1 className="absolute inset-0 font-game text-3xl md:text-5xl tracking-widest leading-none text-center transform skew-x-[3deg] z-30 pointer-events-none opacity-80"
+                                {/* Layer 3: TOP HIGHLIGHT (Gloss) */}
+                                <h1 className="absolute inset-0 font-game text-3xl md:text-5xl tracking-widest leading-none text-center transform skew-x-[3deg] z-40 pointer-events-none opacity-50"
                                      style={{
-                                        backgroundImage: 'linear-gradient(to bottom, white 0%, transparent 40%, transparent 100%)',
+                                        backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 50%)',
                                         WebkitBackgroundClip: 'text',
                                         WebkitTextFillColor: 'transparent',
-                                        maskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)' // Only top part
                                     }}
                                 >
                                     YIELD RAIDERS
