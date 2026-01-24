@@ -39,10 +39,9 @@ export const UpgradeShieldButton: React.FC<Props> = ({ walletAddress, onUpgrade,
                     className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] group-hover:brightness-110"
                 />
                 
-                {/* Overlay Content (In case text on image is hard to read or for dynamic price) */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pt-2">
-                     {/* If image has text 'UPGRADE SHIELD', we can add subtext for price */}
-                     <span className="font-game text-amber-500 text-sm tracking-widest bg-black/60 px-3 py-1 rounded border border-amber-900/50 mt-8">
+                {/* Cost Label - Positioned at Bottom to avoid overlap */}
+                <div className="absolute inset-x-0 bottom-1 flex justify-center">
+                     <span className="font-game text-amber-400 text-[10px] md:text-xs tracking-widest bg-black/90 px-4 py-0.5 rounded-full border border-amber-500/30 shadow-lg backdrop-blur-sm">
                         COST: 10 XLM
                      </span>
                 </div>
