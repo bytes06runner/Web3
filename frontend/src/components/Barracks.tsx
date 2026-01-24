@@ -42,19 +42,19 @@ export function Barracks({ troops, commandTokens, stamina, walletAddress, onTrai
                     const max = unit.id === 'archers' ? 4 : 3;
 
                     return (
-                        <div key={unit.id} className="relative group flex flex-col items-center">
-                            {/* Portrait Frame/Cell */}
-                            <div className="relative w-full aspect-[2/3] bg-black border-4 border-[#333] shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] rounded-sm overflow-hidden group-hover:border-[#555] transition-colors">
+                        <div key={unit.id} className="relative group flex flex-col items-center cursor-pointer">
+                            {/* Portrait Frame/Cell - ENHANCED HOVER */}
+                            <div className="relative w-full aspect-[2/3] bg-black border-4 border-[#333] shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] rounded-sm overflow-hidden transition-all duration-300 ease-out group-hover:border-yellow-500/50 group-hover:rotate-1 group-hover:scale-[1.02] group-hover:shadow-[0_0_25px_rgba(234,179,8,0.5)]">
                                 <img 
                                     src={unit.img} 
                                     alt={unit.name}
-                                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500 filter contrast-125"
+                                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 group-hover:-translate-y-3 transition-all duration-500 ease-out filter contrast-125"
                                 />
                                 {/* Bottom Gradient Overlay for Text */}
                                 <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-black via-black/80 to-transparent"></div>
                                 
                                 <div className="absolute bottom-4 left-0 w-full text-center">
-                                    <h3 className={`font-game text-lg uppercase ${unit.color} text-shadow-black tracking-wider`}>{unit.name}</h3>
+                                    <h3 className={`font-game text-lg uppercase ${unit.color} text-shadow-black tracking-wider group-hover:text-yellow-300 transition-colors`}>{unit.name}</h3>
                                     <div className="flex justify-center gap-4 text-xs font-mono text-gray-400 mt-1">
                                         <span className="flex items-center gap-1 bg-black/50 px-2 rounded"><Sword size={10} /> {unit.dps}</span>
                                         <span className="flex items-center gap-1 bg-black/50 px-2 rounded"><Zap size={10} /> {unit.cap}</span>
@@ -74,12 +74,6 @@ export function Barracks({ troops, commandTokens, stamina, walletAddress, onTrai
                                 disabled={count >= max}
                             >
                                 <img src="/assets/btn_stone_train.png" className="w-full h-full object-contain filter drop-shadow-lg" alt="Train" />
-                                {/* Assuming the button image has TRAIN text engraved. If not, overlay: 
-                                <span className="absolute inset-0 flex items-center justify-center font-game text-stone-300 text-xl tracking-widest drop-shadow-md pt-1">TRAIN</span>
-                                */}
-                                {/* Since we generated 'TRAIN' carved into stone, we don't need overlay text unless image failed text gen. 
-                                    Let's rely on image but keep hidden accessible text.
-                                */}
                                 <span className="sr-only">TRAIN</span>
                             </button>
                         </div>
