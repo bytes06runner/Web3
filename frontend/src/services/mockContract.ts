@@ -207,12 +207,11 @@ export const MockContract = {
             destruction = Math.min(100, 50 + (margin * 5));
             phase = "Townhall";
             
-            const stakeRefund = Math.floor(100 * (destruction / 100));
-            const loot = 20; 
-            reward = stakeRefund + loot;
+            // Double or Nothing Payout
+            reward = 200; // 100 Stake + 100 Profit
             
             logMsg += `\n✅ VICTORY! Destruction: ${destruction.toFixed(0)}%`;
-            logMsg += `\n💰 RECOVERED: ${stakeRefund} XLM + LOOT: ${loot} XLM`;
+            logMsg += `\n💰 WINNER PAYOUT: ${reward} XLM (2x STAKE)`;
             
             state.consecutiveWins = (state.consecutiveWins || 0) + 1;
             
