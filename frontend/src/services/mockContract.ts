@@ -3,6 +3,23 @@ import { StellarService } from './stellarService';
 
 const STORAGE_KEY = 'yield_raiders_state';
 
+
+interface BaseState {
+    level: number;
+    wallHp: number;
+    armyHp: number;
+    townhallHp: number;
+    maxWallHp: number;
+    maxArmyHp: number;
+    maxTownhallHp: number;
+}
+
+interface TroopQueue {
+    archers: number;
+    cavalry: number;
+    giants: number;
+    trainingUntil: number;
+}
 interface GameState {
     principal: number;
     commandTokens: number;
@@ -20,6 +37,8 @@ interface GameState {
     capacity: number;
     consecutiveWins: number;
     cooldownUntil: number;
+    base: BaseState;
+    troops: TroopQueue;
 }
 
 const INITIAL_STATE: GameState = {
@@ -38,7 +57,23 @@ const INITIAL_STATE: GameState = {
     troopLevel: 1,
     capacity: 100,
     consecutiveWins: 0,
-    cooldownUntil: 0
+    cooldownUntil: 0,
+    base: {
+        level: 1,
+        wallHp: 1000,
+        armyHp: 500,
+        townhallHp: 2000,
+        maxWallHp: 1000,
+        maxArmyHp: 500,
+        maxTownhallHp: 2000
+    },
+    troops: {
+        archers: 0,
+        cavalry: 0,
+        giants: 0,
+        trainingUntil: 0
+    },
+
 };
 
 export const MockContract = {
@@ -94,6 +129,43 @@ export const MockContract = {
         return state;
     },
 
+    
+    trainTroops: (type: 'archers' | 'cavalry' | 'giants') => {
+        const state = MockContract.getState();
+        const cost = type === 'archers' ? 10 : type === 'cavalry' ? 25 : 50;
+        
+        if (state.commandTokens < cost) throw new Error("Not enough Command Tokens");
+        
+        state.commandTokens -= cost;
+        
+        // Simulating instant training for demo flow, or small delay could be added
+        if (!state.troops) state.troops = { archers: 0, cavalry: 0, giants: 0, trainingUntil: 0 };
+        
+        state.troops[type] = (state.troops[type] || 0) + 1;
+        state.history.unshift(`Trained ${type.toUpperCase()}`);
+        
+        MockContract.saveState(state);
+        return state;
+    },
+    
+    
+    skipCooldown: () => {
+        const state = MockContract.getState();
+        state.cooldownUntil = 0;
+        state.consecutiveWins = 0; // Reset counter too? Usually yes if paid.
+        state.history.unshift("⏩ Cooldown Skipped (Paid).");
+        MockContract.saveState(state);
+        return state;
+    },
+    refillStrength: () => {
+        // This simulates the paid transaction callback
+        const state = MockContract.getState();
+        state.stamina = 100;
+        state.history.unshift("⚡ Strength Refilled (Paid).");
+        MockContract.saveState(state);
+        return state;
+    },
+    
     recordSteps: (steps: number) => {
         const state = MockContract.getState();
         state.stepCount += steps;
@@ -110,8 +182,9 @@ export const MockContract = {
         return state;
     },
 
-                raid: async (targetName: string, userPublicKey: string, troopCount: number = 10, defenderStats: any = { defense: 50, unit: 'FORTRESS_V1' }) => {
+                    raid: async (targetName: string, userPublicKey: string, troopCount: number = 10, defenderStats: any = { defense: 50, unit: 'FORTRESS_V1' }) => {
         const state = MockContract.getState();
+        
         // --- COOLDOWN CHECK ---
         const now = Date.now();
         if (state.cooldownUntil && state.cooldownUntil > now) {
@@ -119,129 +192,103 @@ export const MockContract = {
             throw new Error(`Army Resting! Cooldown: ${remaining}s`);
         }
 
-        
-        // --- STAMINA CHECK ---
+        // --- STAMINA/CAPACITY CHECK ---
         const STAMINA_COST = 10;
-        if (state.stamina < STAMINA_COST) {
-            throw new Error("Insufficient Stamina! Rest needed.");
-        }
+        if (state.stamina < STAMINA_COST) throw new Error("Insufficient Stamina!");
         state.stamina -= STAMINA_COST;
-        
-        // --- CAPACITY RATIO LOGIC ---
-        const capacity = state.capacity || 100;
-        const staminaRatio = state.stamina / capacity;
-        
-        const TROOP_ATK = 15;
-        let totalAttack = troopCount * TROOP_ATK;
-        const defensePower = (defenderStats.defense || 50) * 1.5; 
 
-        // --- UNIT ADVANTAGE SYSTEM ---
-        const myUnit = 'CYBER_UNIT'; 
-        const defUnit = defenderStats.unit || 'FORTRESS_V1';
-        let advantageMsg = "";
-        let advantageMult = 1.0;
-
-        if (myUnit === 'CYBER_UNIT' && defUnit === 'FORTRESS_V1') {
-            advantageMult = 1.25;
-            advantageMsg = "⚡ UNIT ADVANTAGE";
-        } else if (defUnit === 'CYBER_UNIT') { 
-            advantageMult = 1.0;
-        }
-
-        totalAttack = totalAttack * advantageMult;
-
-        // --- RATIO PHASE MODIFIERS ---
-        let winChanceMod = 0;
-        let phase = "Ambush";
-        let phaseMsg = "";
-
-        if (staminaRatio < 0.70) {
-            winChanceMod -= 0.3; // 30% penalty
-            phaseMsg = "⚠️ PHASE 1 STRUGGLE (Low Energy)";
-            phase = "Breach";
-        } else if (staminaRatio > 0.90) {
-             winChanceMod += 0.2; // 20% bonus
-             phaseMsg = "🚀 PHASE 2 BOOST (High Energy)";
-             phase = "Ambush";
-        } 
+        // --- COMBAT STATS CALCULATOR ---
+        // Attacker Power = Base Troop * (Troops trained)
+        // For simplified MVP, we use the `troopCount` param passed from UI (or 10) PLUS trained troops bonus
         
-        // --- CRITICAL HIT ---
-        const isCrit = Math.random() < 0.10; 
+        let archerPower = (state.troops?.archers || 0) * 5;
+        let cavalryPower = (state.troops?.cavalry || 0) * 15;
+        let giantPower = (state.troops?.giants || 0) * 50;
         
-        // --- PROBABILITY LOGIC ---
-        const diff = totalAttack - defensePower;
-        const scale = Math.max(totalAttack, defensePower) || 1;
-        let winChance = 0.5 + (diff / (scale * 2)); 
+        let totalAttack = (troopCount * 15) + archerPower + cavalryPower + giantPower;
         
-        // Apply Ratio Modifier
-        winChance += winChanceMod;
+        // Defender Stats (Simulated)
+        const defWall = defenderStats.wallHp || 1000;
+        const defArmy = defenderStats.armyHp || 500;
+        const defTownhall = defenderStats.townhallHp || 2000;
         
-        winChance = Math.max(0.1, Math.min(0.9, winChance));
-        
-        const roll = Math.random();
-        let success = isCrit || (roll < winChance);
+        let logMsg = `⚔️ RAID INITIATED! Power: ${totalAttack}`;
+        let currentDmg = totalAttack;
+        let phase = "";
         let destruction = 0;
-        let logMsg = "";
+        
+        // --- PHASE 1: WALL ---
+        let dmgWall = Math.min(currentDmg, defWall);
+        currentDmg -= dmgWall;
+        logMsg += `
+🧱 WALL: Dealt ${dmgWall} DMG.`;
+        
+        if (currentDmg <= 0) {
+            phase = "Wall";
+            destruction = (dmgWall / (defWall + defArmy + defTownhall)) * 100;
+            logMsg += ` Attack Stopped at Wall.`;
+        } else {
+             // --- PHASE 2: ARMY ---
+             logMsg += ` WALL BREACHED!`;
+             let dmgArmy = Math.min(currentDmg, defArmy);
+             currentDmg -= dmgArmy;
+             logMsg += `
+🛡️ DEFENSE ARMY: Dealt ${dmgArmy} DMG.`;
+             
+             if (currentDmg <= 0) {
+                 phase = "Army";
+                 destruction = ((defWall + dmgArmy) / (defWall + defArmy + defTownhall)) * 100;
+                 logMsg += ` Attack Stopped by Army.`;
+             } else {
+                 // --- PHASE 3: TOWNHALL ---
+                 logMsg += ` ARMY DEFEATED!`;
+                 let dmgTownhall = Math.min(currentDmg, defTownhall);
+                 // Bonus Dmg to structure
+                 dmgTownhall *= 1.5; 
+                 
+                 phase = "Townhall";
+                 destruction = ((defWall + defArmy + dmgTownhall) / (defWall + defArmy + defTownhall)) * 100;
+                 logMsg += `
+🏰 TOWNHALL: Dealt ${dmgTownhall.toFixed(0)} DMG.`;
+                 
+                 if (dmgTownhall >= defTownhall) {
+                     logMsg += ` BASE DESTROYED!`;
+                     destruction = 100;
+                 }
+             }
+        }
+        
+        let success = destruction > 30; // Win condition
+        
+        // Escrow Payout Logic
         let reward = 0;
-
+        if (destruction >= 100) reward = 200; // 2x Wager (Simulated 100 wager)
+        else if (destruction >= 30) reward = 50 + Math.floor(destruction); // Partial
+        
         if (success) {
             state.consecutiveWins = (state.consecutiveWins || 0) + 1;
             if (state.consecutiveWins >= 5) {
                 state.cooldownUntil = Date.now() + 10000;
                 state.consecutiveWins = 0;
-                logMsg += " (💤 Army Resting 10s)";
+                logMsg += " (💤 Fatigue: 10s Cooldown)";
             }
-            // Victory
-            const margin = winChance - roll; 
-            
-            // PHASE 3 CHECK
-            if (staminaRatio > 0.97) {
-                 destruction = 100;
-                 reward += 100; // Bonus
-                 logMsg = `💎 PHASE 3 UNLOCKED: VAULT CRACKED! (+100 XLM) `;
-                 phase = "Vault";
-            } else if (isCrit) {
-                destruction = 100;
-                logMsg = `💥 CRITICAL HIT! 100% DESTRUCTION!`;
-            } else {
-                 if (margin > 0.3) destruction = 100;
-                 else if (margin > 0.1) destruction = 75;
-                 else destruction = 40;
-                 logMsg = `⚔️ Raid SUCCESS! ${phaseMsg}`;
-            }
+            state.commandTokens += reward * 5;
+            state.yieldEarned += reward;
+            logMsg += `
+💰 LOOT: ${reward} XLM`;
         } else {
             state.consecutiveWins = 0;
-            destruction = Math.floor(Math.random() * 10); 
-            logMsg = `🛡️ Raid FAILED. ${phaseMsg}`;
+            logMsg += `
+❌ RAID FAILED. Defense Held.`;
         }
-        
-        let payoutPct = 0;
-        if (destruction >= 100) payoutPct = 100; 
-        else if (destruction >= 75) payoutPct = 50;
-        else if (destruction >= 40) payoutPct = 25;
-        
-        reward += payoutPct; 
-        
-        if (success && reward > 0) {
-             try {
-                // await StellarService.payoutToUser(userPublicKey, reward.toString());
-                state.commandTokens += reward * 10;
-                state.yieldEarned += reward; 
-                state.history.unshift(`✅ Victory! Looted ${reward} XLM`);
-             } catch(e) {
-                 state.history.unshift(`❌ Payout Simulated Failed`);
-             }
-        }
-        
-        state.history.unshift(logMsg);
 
-        // Deduct Troops
-        const lossRate = success ? 0.05 : 0.3;
-        state.troopCount = Math.max(0, Math.floor(state.troopCount * (1 - lossRate)));
-        
+        state.history.unshift(logMsg.split('
+')[0]); // Summary only for feed
         MockContract.saveState(state);
+        
         return { success, reward, destruction, phase, log: logMsg };
     },
+
 
     requestDrill: async (userPublicKey: string) => {
          try {

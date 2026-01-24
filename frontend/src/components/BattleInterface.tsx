@@ -101,46 +101,47 @@ export const BattleInterface: React.FC<BattleInterfaceProps> = ({
                     {/* Center Panel: Visualization (6 Cols) */}
                     <div className="col-span-6 flex flex-col relative">
                         
-                        {/* Hexagon Battle Display */}
-                        <div className="flex justify-center items-center gap-12 mb-8 mt-4 relative">
-                            {/* Connection Line */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-[1px] bg-gradient-to-r from-cyan-500/50 to-red-500/50"></div>
-
-                            {/* Attacker Hex */}
-                            <div className="relative group">
-                                <div className="w-32 h-32 flex items-center justify-center relative">
-                                    <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full text-cyan-500 drop-shadow-[0_0_10px_rgba(6,182,212,0.5)]">
-                                        <path d="M50 5 L95 27.5 L95 72.5 L50 95 L5 72.5 L5 27.5 Z" fill="none" stroke="currentColor" strokeWidth="2" />
-                                    </svg>
-                                    <Zap size={48} className="text-cyan-400 z-10" />
+                        {/* Triple Layer Battle Display */}
+                        {/* Triple Layer Combat Display */}
+                        <div className="flex flex-col gap-4 mb-8 mt-4 relative">
+                            {/* Layer 1: Wall */}
+                            <div className="bg-black/40 p-3 rounded-lg border border-white/10 relative overflow-hidden group">
+                                <div className="absolute inset-0 bg-blue-500/10 group-hover:bg-blue-500/20 transition-all"></div>
+                                <div className="flex justify-between text-xs font-mono text-blue-300 mb-1 relative z-10">
+                                    <span>PHASE 1: THE WALL</span>
+                                    <span>{logs.some(l=>l.includes('WALL BREACHED')) ? 'DESTROYED' : 'ACTIVE'}</span>
                                 </div>
-                                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-center w-40">
-                                    <div className="text-cyan-400 text-xs font-bold uppercase tracking-wider mb-1">Attacker</div>
-                                    <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-                                        <div className="h-full bg-cyan-500 w-full shadow-[0_0_10px_cyan]"></div>
-                                    </div>
+                                <div className="h-2 w-full bg-black/50 rounded-full overflow-hidden relative z-10">
+                                    {/* Simulated HP Bar logic based on logs? Or just static representation for MVP */}
+                                    <div className={`h-full bg-blue-500 transition-all duration-1000 ${logs.some(l=>l.includes('WALL BREACHED')) ? 'w-0' : 'w-full'}`}></div>
                                 </div>
                             </div>
 
-                            {/* Defender Hex */}
-                            <div className="relative group">
-                                <div className="w-32 h-32 flex items-center justify-center relative">
-                                    <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]">
-                                        <path d="M50 5 L95 27.5 L95 72.5 L50 95 L5 72.5 L5 27.5 Z" fill="none" stroke="currentColor" strokeWidth="2" />
-                                    </svg>
-                                    <Castle size={48} className="text-red-500 z-10" />
+                            {/* Layer 2: Army */}
+                            <div className="bg-black/40 p-3 rounded-lg border border-white/10 relative overflow-hidden group">
+                                <div className="absolute inset-0 bg-red-500/10 group-hover:bg-red-500/20 transition-all"></div>
+                                <div className="flex justify-between text-xs font-mono text-red-300 mb-1 relative z-10">
+                                    <span>PHASE 2: DEFENSE ARMY</span>
+                                    <span>{logs.some(l=>l.includes('ARMY DEFEATED')) ? 'DEFEATED' : 'STANDING'}</span>
                                 </div>
-                                <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-center w-40">
-                                    <div className="text-red-500 text-xs font-bold uppercase tracking-wider mb-1">{defender.name}</div>
-                                    <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-                                        <div 
-                                            className="h-full bg-red-500 transition-all duration-500 shadow-[0_0_10px_red]"
-                                            style={{ width: `${Math.max(0, 100 - (result?.destruction || 0))}%` }}
-                                        ></div>
-                                    </div>
+                                <div className="h-2 w-full bg-black/50 rounded-full overflow-hidden relative z-10">
+                                     <div className={`h-full bg-red-500 transition-all duration-1000 ${logs.some(l=>l.includes('ARMY DEFEATED')) ? 'w-0' : logs.some(l=>l.includes('WALL BREACHED')) ? 'w-full' : 'w-full'}`}></div>
+                                </div>
+                            </div>
+
+                            {/* Layer 3: Townhall */}
+                            <div className="bg-black/40 p-3 rounded-lg border border-white/10 relative overflow-hidden group">
+                                <div className="absolute inset-0 bg-yellow-500/10 group-hover:bg-yellow-500/20 transition-all"></div>
+                                <div className="flex justify-between text-xs font-mono text-yellow-300 mb-1 relative z-10">
+                                    <span>PHASE 3: TOWNHALL</span>
+                                    <span>{logs.some(l=>l.includes('BASE DESTROYED')) ? 'COLLAPSED' : 'SECURE'}</span>
+                                </div>
+                                <div className="h-2 w-full bg-black/50 rounded-full overflow-hidden relative z-10">
+                                     <div className={`h-full bg-yellow-500 transition-all duration-1000 ${logs.some(l=>l.includes('BASE DESTROYED')) ? 'w-0' : logs.some(l=>l.includes('ARMY DEFEATED')) ? 'w-full' : 'w-full'}`}></div>
                                 </div>
                             </div>
                         </div>
+    
 
                         {/* Terminal Log */}
                         <div className="flex-1 bg-black/40 border border-white/10 rounded-lg p-4 font-mono text-sm overflow-hidden relative group">

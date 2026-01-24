@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Sword, Shield, RefreshCw } from 'lucide-react';
 import { MockContract } from '../services/mockContract';
 import { BattleInterface } from './BattleInterface';
+import { StellarService } from '../services/stellarService';
 
 interface BattleArenaProps {
     refreshGame: () => void;
@@ -67,6 +68,23 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
         setLogs(["ready_for_deployment..."]);
         setBattleResult(null);
         setModalOpen(true);
+    };
+
+    
+    const handleSkipCooldown = async () => {
+        if (!walletAddress) {
+            onToast?.('error', 'Connect Wallet to Skip');
+            return;
+        }
+        try {
+            onToast?.('info', 'Signing Skip Transaction...');
+            await StellarService.deposit(walletAddress, "5"); // 5 XLM Cost
+            MockContract.skipCooldown();
+            setCooldown(0);
+            onToast?.('success', 'Cooldown Skipped!');
+        } catch (e: any) {
+            onToast?.('error', 'Payment Failed');
+        }
     };
 
     const handleLaunch = async () => {
@@ -171,10 +189,10 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                             </div>
 
                             <button
-                                onClick={() => initiateRaid(opp)}
-                                disabled={raiding || (user?.username === opp.username) || cooldown > 0}
+                                onClick={() => cooldown > 0 ? handleSkipCooldown() : initiateRaid(opp)}
+                                disabled={raiding || (user?.username === opp.username) }
                                 className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                            >{cooldown > 0 ? `REST ${cooldown}s` : "BATTLE"}</button>
+                            >{cooldown > 0 ? `⚡ SKIP (${cooldown}s) - 5 XLM` : "BATTLE"}</button>
                         </div>
                     ))}
                 </div>

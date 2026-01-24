@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { BattleArena } from './components/BattleArena';
+import { Barracks } from './components/Barracks';
 import { FitnessTracker } from './components/FitnessTracker';
 import { MockContract } from './services/mockContract';
 import { Leaderboard } from './components/Leaderboard';
@@ -250,11 +251,13 @@ function App() {
                 />
               </div>
               <div className="flex-1">
-                <FitnessTracker
-                    refreshGame={refreshGame}
-                    currentSteps={gameState.stepCount}
-                    onToast={(type: ToastType, msg: string) => addToast(type, msg)}
+                <Barracks
+                    troops={gameState.troops}
+                    commandTokens={gameState.commandTokens}
+                    stamina={gameState.stamina}
                     walletAddress={walletAddress}
+                    onTrain={() => { refreshGame(); fetchUserData(); }}
+                    onToast={(type: ToastType, msg: string) => addToast(type, msg)}
                 />
               </div>
             </div>
