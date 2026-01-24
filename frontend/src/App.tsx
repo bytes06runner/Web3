@@ -124,6 +124,11 @@ function App() {
     return () => clearInterval(interval);
   }, [view, fetchUserData]);
 
+  
+  const capacityUsed = ((gameState.troops?.archers||0)*5) + ((gameState.troops?.infantry||0)*10) + ((gameState.troops?.giants||0)*20);
+  const availableCapacity = 100 - capacityUsed;
+
+
   const handleDeposit = async () => {
     if (!walletAddress) {
         addToast('error', 'Connect Wallet first!');
@@ -233,7 +238,7 @@ function App() {
 
             <Dashboard
               balance={xlmBalance}
-              capacity={user?.capacity || 100}
+              capacity={availableCapacity}
               commandTokens={gameState.commandTokens}
               yieldEarned={gameState.yieldEarned}
               defense={user?.stats?.defense || gameState.defense}

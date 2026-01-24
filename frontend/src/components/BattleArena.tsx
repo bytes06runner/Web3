@@ -128,6 +128,16 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                  addLog("✅ DEFENSE PENETRATED!");
                  addLog(`💥 DESTRUCTION: ${result.destruction.toFixed(1)}%`);
                  addLog(`💸 PAYOUT: ${result.reward} XLM`);
+                 
+                 // Real Payout Trigger
+                 try {
+                     addLog("🏦 TRANSFERRING REWARD FROM BANK...");
+                     await StellarService.payoutToUser(walletAddress, result.reward.toString());
+                     addLog("✅ FUNDS RECEIVED IN WALLET");
+                 } catch (payoutError) {
+                     console.error(payoutError);
+                     addLog("⚠️ PAYOUT TX FAILED (Check Bank Balance)");
+                 }
             } else {
                  addLog("🛡️ ATTACK REPELLED.");
                  addLog("⚠️ STAKE LIQUIDATED.");
