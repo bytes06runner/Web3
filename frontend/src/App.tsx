@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { BattleArena } from './components/BattleArena';
 import { Barracks } from './components/Barracks';
+import { UpgradeShieldButton } from './components/UpgradeShieldButton'; // NEW COMPONENT
 import { MockContract } from './services/mockContract';
 import { Leaderboard } from './components/Leaderboard';
 import { ActivityLog } from './components/ActivityLog';
@@ -50,7 +51,7 @@ function App() {
   };
 
   const removeToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
-  const refreshGame = () => setGameState(MockContract.getState());
+  const refreshGame = () => { setGameState(MockContract.getState()); fetchUserData(); };
 
   const handleConnectWallet = async () => {
     try {
@@ -82,15 +83,12 @@ function App() {
               setUser(updatedUser);
               localStorage.setItem('user', JSON.stringify(updatedUser)); 
           }
-      } catch (err) {
-          console.error("Failed to refresh user data", err);
-      }
+      } catch (err) { console.error("Failed to refresh user data", err); }
   }, [user?.walletAddress]);
 
   useEffect(() => {
     if (view !== 'game') return;
     refreshGame();
-    fetchUserData();
     const interval = setInterval(() => {
       const newState = MockContract.claimYield();
       setGameState(newState);
@@ -102,19 +100,16 @@ function App() {
   const capacityUsed = ((gameState.troops?.archers||0)*5) + ((gameState.troops?.infantry||0)*10) + ((gameState.troops?.giants||0)*20);
   const availableCapacity = 100 - capacityUsed;
 
-  const handleDeposit = async () => { /* Deprecated logic kept for safety/flow but main flow is wallet */ };
+  const handleDeposit = async () => {}; 
 
   if (view === 'login') return <Login onLoginSuccess={(u) => { setUser(u); setView('game'); }} onSwitchToRegister={() => setView('register')} />;
   if (view === 'register') return <Register onRegisterSuccess={(u) => { setUser(u); setView('game'); }} onSwitchToLogin={() => setView('login')} />;
 
-  // NOTE: If wallet not connected but user logged in (web2 login), show restricted view or prompt. 
-  // For this design overhaul, we assume main game structure immediately.
-
   return (
-    <div className="min-h-screen pb-20 relative text-white font-sans selection:bg-cyan-500/30">
+    <div className="min-h-screen pb-20 relative text-white font-sans selection:bg-red-500/30">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
-      {/* 1. Header (Wood Banner) */}
+      {/* 1. Header */}
       <Header 
          balance={xlmBalance} 
          apy="+5% APY"
@@ -124,7 +119,7 @@ function App() {
          onConnect={handleConnectWallet}
       />
 
-      <main className="max-w-6xl mx-auto px-4 space-y-8 relative z-10">
+      <main className="max-w-6xl mx-auto px-4 space-y-12 relative z-10">
         
         {/* 2. Mid Bar (Status Indicators) */}
         <Dashboard 
@@ -134,24 +129,33 @@ function App() {
             className="max-w-4xl mx-auto"
         />
 
-        {/* 3. The Barracks (Main Action Area) */}
+        {/* 3. The Barracks (3-Column Dungeon) */}
         <div className="w-full animate-in fade-in zoom-in duration-500">
             <Barracks
                 troops={gameState.troops}
                 commandTokens={gameState.commandTokens}
                 stamina={gameState.stamina}
                 walletAddress={walletAddress}
-                onTrain={() => { refreshGame(); fetchUserData(); }}
+                onTrain={refreshGame}
                 onToast={(type: ToastType, msg: string) => addToast(type, msg)}
             />
         </div>
 
-        {/* 4. The Lower Deck (3 Columns) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-            {/* Left: Battle Arena (Scroll) */}
+        {/* 4. Upgrade Shield Button (New Section) */}
+        <div className="w-full">
+            <UpgradeShieldButton 
+                walletAddress={walletAddress}
+                onUpgrade={refreshGame}
+                onToast={(type: ToastType, msg: string) => addToast(type, msg)}
+            />
+        </div>
+
+        {/* 5. The Lower Deck (Arena, Leaderboard, Log) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start pb-12">
+            {/* Left: Battle Arena */}
             <div className="md:mt-4">
                 <BattleArena
-                    refreshGame={() => { refreshGame(); fetchUserData(); }}
+                    refreshGame={refreshGame}
                     onToast={(type: ToastType, msg: string) => addToast(type, msg)}
                     walletAddress={walletAddress}
                     user={user}
@@ -160,12 +164,12 @@ function App() {
                 />
             </div>
             
-            {/* Center: Leaderboard (Gold Frame) */}
-            <div className="relative z-20 md:-mt-8 scale-110">
+            {/* Center: Leaderboard */}
+            <div className="relative z-20 md:-mt-8 scale-105">
                 <Leaderboard />
             </div>
 
-            {/* Right: Activity Log (Scroll) */}
+            {/* Right: Activity Log */}
             <div className="md:mt-4">
                 <ActivityLog history={gameState.history} />
             </div>
@@ -173,8 +177,8 @@ function App() {
 
       </main>
 
-      {/* Background Overlay for Depth (Optional vignette) */}
-      <div className="fixed inset-0 pointer-events-none bg-gradient-to-t from-black/80 via-transparent to-black/20 z-0"></div>
+      {/* Background Overlay */}
+      <div className="fixed inset-0 pointer-events-none bg-gradient-to-t from-black/90 via-black/20 to-black/40 z-0"></div>
     </div>
   );
 }
