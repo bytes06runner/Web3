@@ -107,29 +107,62 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
 
         setRaiding(true);
         setLogs([]); 
+        setBattleResult(null);
 
         const addLog = (msg: string) => setLogs(prev => [...prev, msg]);
+        const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
         addLog("🔗 INITIATING SECURE STAKE PROTOCOL...");
         
         try {
             await StellarService.deposit(walletAddress, "100");
             addLog("💰 STAKE LOCKED: 100 XLM");
-            await new Promise(r => setTimeout(r, 800));
+            await delay(1000);
             
-            addLog("🚀 LAUNCHING V3 ASSAULT UNITS...");
-            addLog(`⚔️ TOTAL ARMY DPS: ${dps} vs DEF: ${def}`);
-            await new Promise(r => setTimeout(r, 1000));
+            // --- PHASE 1: THE WALL ---
+            addLog("📡 PHASE 1: TARGETING WALL STRUCTURE...");
+            await delay(1500);
 
+            // Wall Check (Need 30% of Defense to Breach Wall)
+            if (dps < def * 0.3) {
+                 addLog("❌ WALL REFLECTED DAMAGE.");
+                 addLog("⚠️ ATTACK FAILED AT PHASE 1.");
+                 addLog("💸 STAKE LOST.");
+                 setRaiding(false);
+                 return;
+            }
+            addLog("💥 WALL BREACHED! DEFENSE INTEGRITY DROPPING...");
+            
+            // --- PHASE 2: THE ARMY ---
+            await delay(1500);
+            addLog("⚔️ PHASE 2: ENGAGING DEFENSE ARMY...");
+            await delay(2000); // Suspense
+
+            // Army Check (Need > Defense to Win fully)
+            if (dps <= def) {
+                 addLog("🛡️ ENEMY UNITS HELD THE LINE.");
+                 addLog("❌ ARMY DEFEATED. RETREATING...");
+                 addLog("💸 STAKE LOST.");
+                 setRaiding(false);
+                 return;
+            }
+            addLog("💀 DEFENSE ARMY ELIMINATED! PATH CLEAR.");
+
+            // --- PHASE 3: TOWNHALL ---
+            await delay(1500);
+            addLog("🔥 PHASE 3: STORMING TOWNHALL...");
+            await delay(1500);
+            
+            // Execute Contract Logic for Rewards
             const targetName = selectedOpponent.username || 'Unknown';
             const result = await MockContract.raid(targetName, walletAddress, 0, selectedOpponent.stats);
 
+            addLog("🏰 TOWNHALL SACKED! BASE DESTROYED.");
+            addLog(`💥 TOTAL DESTRUCTION: ${result.destruction.toFixed(0)}%`);
+            addLog(`💸 PAYOUT: ${result.reward} XLM`);
+
+            // Real Payout Trigger
             if (result.success) {
-                 addLog("✅ DEFENSE PENETRATED!");
-                 addLog(`💥 DESTRUCTION: ${result.destruction.toFixed(1)}%`);
-                 addLog(`💸 PAYOUT: ${result.reward} XLM`);
-                 
-                 // Real Payout Trigger
                  try {
                      addLog("🏦 TRANSFERRING REWARD FROM BANK...");
                      await StellarService.payoutToUser(walletAddress, result.reward.toString());
@@ -138,13 +171,10 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                      console.error(payoutError);
                      addLog("⚠️ PAYOUT TX FAILED (Check Bank Balance)");
                  }
-            } else {
-                 addLog("🛡️ ATTACK REPELLED.");
-                 addLog("⚠️ STAKE LIQUIDATED.");
             }
             
             setBattleResult(result);
-            await new Promise(r => setTimeout(r, 1500));
+            await delay(2000);
             refreshGame(); 
             
         } catch (e: any) {
