@@ -1,14 +1,14 @@
 // @ts-nocheck
 import { useEffect, useState, useCallback } from 'react';
+import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { BattleArena } from './components/BattleArena';
 import { Barracks } from './components/Barracks';
-import { FitnessTracker } from './components/FitnessTracker';
 import { MockContract } from './services/mockContract';
 import { Leaderboard } from './components/Leaderboard';
+import { ActivityLog } from './components/ActivityLog';
 import { WalletService } from './services/walletService';
 import { StellarService } from './services/stellarService';
-import { Wallet, Bell, LogOut } from 'lucide-react';
 import { ToastContainer, type ToastMessage, type ToastType } from './components/ui/Toast';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
@@ -16,14 +16,11 @@ import { Register } from './pages/Register';
 function App() {
   const [user, setUser] = useState<any>(null);
   const [view, setView] = useState<'login' | 'register' | 'game'>('login');
-
   const [gameState, setGameState] = useState(MockContract.getState());
   const [isDepositing, setIsDepositing] = useState(false);
-  
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [xlmBalance, setXlmBalance] = useState<string>('0');
   const [isConnecting, setIsConnecting] = useState(false);
-
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   useEffect(() => {
@@ -47,41 +44,28 @@ function App() {
     const id = Math.random().toString(36).substring(7);
     setToasts(prev => {
       const newToasts = [...prev, { id, type, message }];
-      if (newToasts.length > 3) {
-        return newToasts.slice(newToasts.length - 3);
-      }
+      if (newToasts.length > 3) return newToasts.slice(newToasts.length - 3);
       return newToasts;
     });
   };
 
-  const removeToast = (id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  };
+  const removeToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
+  const refreshGame = () => setGameState(MockContract.getState());
 
-  const refreshGame = () => {
-    setGameState(MockContract.getState());
-  };
-
-  // Connect wallet
   const handleConnectWallet = async () => {
     try {
       setIsConnecting(true);
       const address = await WalletService.connect();
       setWalletAddress(address);
-      
-      // Fetch real balance
       const balance = await StellarService.getBalance(address);
       setXlmBalance(balance);
-      
-      // Update Game State to reflect Wallet Balance as TVL
       const numericBalance = parseFloat(balance);
       if (!isNaN(numericBalance)) {
           MockContract.setPrincipal(numericBalance);
           if (user?.capacity) MockContract.setCapacity(user.capacity);
           setGameState(MockContract.getState());
       }
-
-      addToast('success', `Wallet connected! ${address.slice(0, 4)}...${address.slice(-4)}`);
+      addToast('success', `Wallet connected!`);
     } catch (error: any) {
       addToast('error', error.message || 'Failed to connect wallet');
     } finally {
@@ -96,7 +80,7 @@ function App() {
           if (res.ok) {
               const updatedUser = await res.json();
               setUser(updatedUser);
-              localStorage.setItem('user', JSON.stringify(updatedUser)); // Persist for reload
+              localStorage.setItem('user', JSON.stringify(updatedUser)); 
           }
       } catch (err) {
           console.error("Failed to refresh user data", err);
@@ -105,193 +89,92 @@ function App() {
 
   useEffect(() => {
     if (view !== 'game') return;
-
-    // Initial load
     refreshGame();
     fetchUserData();
-
-    // Poll for updates every 5 seconds
     const interval = setInterval(() => {
-      // const oldYield = gameState.yieldEarned;
       const newState = MockContract.claimYield();
       setGameState(newState);
-
-      // Refresh User Data (Regen Capacity)
       fetchUserData();
-
-      // Yield Toast REMOVED as per user request
     }, 5000);
     return () => clearInterval(interval);
   }, [view, fetchUserData]);
 
-  
   const capacityUsed = ((gameState.troops?.archers||0)*5) + ((gameState.troops?.infantry||0)*10) + ((gameState.troops?.giants||0)*20);
   const availableCapacity = 100 - capacityUsed;
 
+  const handleDeposit = async () => { /* Deprecated logic kept for safety/flow but main flow is wallet */ };
 
-  const handleDeposit = async () => {
-    if (!walletAddress) {
-        addToast('error', 'Connect Wallet first!');
-        return;
-    }
-    setIsDepositing(true);
-    try {
-        addToast('info', 'Please sign the transaction in Freighter...');
-        const txHash = await StellarService.deposit(walletAddress, "100"); // 100 XLM Deposit
-        
-        // Mock Contract update (reflecting on-chain state)
-        // In a full indexer setup, we would wait for backend to see tx.
-        // Here we trust our own submission for immediate UI feedback.
-        MockContract.deposit(100); 
-        refreshGame();
-        
-        addToast('success', `Deposit Confirmed! TX: ${txHash.substring(0, 8)}...`);
-    } catch (e: any) {
-        addToast('error', e.message || 'Deposit Failed');
-    } finally {
-        setIsDepositing(false);
-    }
-  };
+  if (view === 'login') return <Login onLoginSuccess={(u) => { setUser(u); setView('game'); }} onSwitchToRegister={() => setView('register')} />;
+  if (view === 'register') return <Register onRegisterSuccess={(u) => { setUser(u); setView('game'); }} onSwitchToLogin={() => setView('login')} />;
 
-  if (view === 'login') {
-      return <Login onLoginSuccess={(u) => { setUser(u); setView('game'); }} onSwitchToRegister={() => setView('register')} />;
-  }
-  if (view === 'register') {
-      return <Register onRegisterSuccess={(u) => { setUser(u); setView('game'); }} onSwitchToLogin={() => setView('login')} />;
-  }
+  // NOTE: If wallet not connected but user logged in (web2 login), show restricted view or prompt. 
+  // For this design overhaul, we assume main game structure immediately.
 
   return (
-    <div className="min-h-screen pb-20 relative bg-[#0f172a] text-white">
+    <div className="min-h-screen pb-20 relative text-white font-sans selection:bg-cyan-500/30">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
-      <nav className="border-b border-white/5 bg-black/20 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-lg flex items-center justify-center font-bold text-white">Y</div>
-            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">Yield Raiders</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-gray-400 text-sm hidden md:block font-mono">
-                {user?.username ? `CMD ${user.username}` : ''}
-            </span>
-            <button className="p-2 text-gray-400 hover:text-white transition-colors relative">
-              <Bell size={20} />
-              {gameState.history.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>}
-            </button>
-            <button 
-              onClick={handleConnectWallet}
-              disabled={isConnecting}
-              className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/10 px-4 py-2 rounded-full transition-all text-sm text-white font-medium disabled:opacity-50"
-            >
-              <Wallet size={16} />
-              {walletAddress 
-                ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`
-                : gameState.principal > 0 
-                  ? '0xUser...Wallet' 
-                  : 'Connect'
-              }
-            </button>
-            <button onClick={handleLogout} className="p-2 text-red-500/70 hover:text-red-400 transition-colors" title="Logout">
-                <LogOut size={20} />
-            </button>
-          </div>
-        </div>
-      </nav>
+      {/* 1. Header (Wood Banner) */}
+      <Header 
+         balance={xlmBalance} 
+         apy="+5% APY"
+         username={user?.username || 'Guest'}
+         onLogout={handleLogout}
+         walletAddress={walletAddress}
+         onConnect={handleConnectWallet}
+      />
 
-      <main className="max-w-5xl mx-auto px-4 pt-8 space-y-8">
+      <main className="max-w-6xl mx-auto px-4 space-y-8 relative z-10">
+        
+        {/* 2. Mid Bar (Status Indicators) */}
+        <Dashboard 
+            capacity={availableCapacity}
+            defense={user?.stats?.defense || gameState.defense}
+            streakDays={gameState.streakDays}
+            className="max-w-4xl mx-auto"
+        />
 
-        {gameState.principal === 0 && (
-          <div className="glass-panel p-8 rounded-2xl text-center border border-white/10 bg-white/5 backdrop-blur-md">
-            <h2 className="text-3xl font-bold text-white mb-4">Your Fortress Awaits</h2>
-            <p className="text-gray-400 mb-8 max-w-lg mx-auto">
-              {walletAddress 
-                ? `Connected: ${xlmBalance} XLM available. Deposit USDC to start.`
-                : 'Connect your Freighter wallet to start playing on Stellar blockchain'
-              }
-            </p>
-            {!walletAddress ? (
-              <button
-                onClick={handleConnectWallet}
-                disabled={isConnecting}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg shadow-purple-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-              >
-                {isConnecting ? 'Connecting...' : 'Connect Freighter Wallet'}
-              </button>
-            ) : (
-              <button
-                onClick={handleDeposit}
-                disabled={isDepositing}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg shadow-purple-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-              >
-                {isDepositing ? 'Deploying Vault...' : 'Deposit USDC (Demo)'}
-              </button>
-            )}
-          </div>
-        )}
-
-        {gameState.principal > 0 && (
-          <>
-            <div className="bg-slate-800/50 p-4 rounded-lg mb-6 flex justify-between items-center border border-white/5">
-               <span className="text-gray-300">Stellar Balance:</span>
-               <span className="text-xl font-mono text-yellow-400">{xlmBalance} XLM</span>
-            </div>
-
-            <Dashboard
-              balance={xlmBalance}
-              capacity={availableCapacity}
-              commandTokens={gameState.commandTokens}
-              yieldEarned={gameState.yieldEarned}
-              defense={user?.stats?.defense || gameState.defense}
-              stamina={gameState.stamina}
-              streakDays={gameState.streakDays}
+        {/* 3. The Barracks (Main Action Area) */}
+        <div className="w-full animate-in fade-in zoom-in duration-500">
+            <Barracks
+                troops={gameState.troops}
+                commandTokens={gameState.commandTokens}
+                stamina={gameState.stamina}
+                walletAddress={walletAddress}
+                onTrain={() => { refreshGame(); fetchUserData(); }}
+                onToast={(type: ToastType, msg: string) => addToast(type, msg)}
             />
+        </div>
 
-            <div className="flex flex-col md:flex-row gap-8">
-              <div className="flex-1">
+        {/* 4. The Lower Deck (3 Columns) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+            {/* Left: Battle Arena (Scroll) */}
+            <div className="md:mt-4">
                 <BattleArena
                     refreshGame={() => { refreshGame(); fetchUserData(); }}
                     onToast={(type: ToastType, msg: string) => addToast(type, msg)}
                     walletAddress={walletAddress}
                     user={user}
                     xlmBalance={xlmBalance}
-                    troops={gameState.troops} /* CRITICAL FIX: Passing global troops state */
-                />
-              </div>
-              <div className="flex-1">
-                <Barracks
                     troops={gameState.troops}
-                    commandTokens={gameState.commandTokens}
-                    stamina={gameState.stamina}
-                    walletAddress={walletAddress}
-                    onTrain={() => { refreshGame(); fetchUserData(); }}
-                    onToast={(type: ToastType, msg: string) => addToast(type, msg)}
                 />
-              </div>
+            </div>
+            
+            {/* Center: Leaderboard (Gold Frame) */}
+            <div className="relative z-20 md:-mt-8 scale-110">
+                <Leaderboard />
             </div>
 
-            {/* Activity Feed & Leaderboard */}
-            <div className="flex flex-col md:flex-row gap-8">
-              <div className="flex-1 glass-panel p-6 rounded-2xl h-full border border-white/10 bg-white/5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">Activity Log</h3>
-                  <span className="text-xs text-gray-500">Real-time updates</span>
-                </div>
-                <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                  {gameState.history.map((log, i) => (
-                    <div key={i} className="text-sm text-gray-400 border-b border-white/5 pb-2 last:border-0 animate-in fade-in slide-in-from-left-2">
-                      {log}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex-1">
-                 <Leaderboard />
-              </div>
+            {/* Right: Activity Log (Scroll) */}
+            <div className="md:mt-4">
+                <ActivityLog history={gameState.history} />
             </div>
-          </>
-        )}
+        </div>
+
       </main>
+
+      {/* Background Overlay for Depth (Optional vignette) */}
+      <div className="fixed inset-0 pointer-events-none bg-gradient-to-t from-black/80 via-transparent to-black/20 z-0"></div>
     </div>
   );
 }

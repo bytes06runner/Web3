@@ -123,7 +123,6 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
             addLog("📡 PHASE 1: TARGETING WALL STRUCTURE...");
             await delay(1500);
 
-            // Wall Check (Need 30% of Defense to Breach Wall)
             if (dps < def * 0.3) {
                  addLog("❌ WALL REFLECTED DAMAGE.");
                  addLog("⚠️ ATTACK FAILED AT PHASE 1.");
@@ -136,9 +135,8 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
             // --- PHASE 2: THE ARMY ---
             await delay(1500);
             addLog("⚔️ PHASE 2: ENGAGING DEFENSE ARMY...");
-            await delay(2000); // Suspense
+            await delay(2000); 
 
-            // Army Check (Need > Defense to Win fully)
             if (dps <= def) {
                  addLog("🛡️ ENEMY UNITS HELD THE LINE.");
                  addLog("❌ ARMY DEFEATED. RETREATING...");
@@ -153,16 +151,15 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
             addLog("🔥 PHASE 3: STORMING TOWNHALL...");
             await delay(1500);
             
-            // Execute Contract Logic for Rewards
             const targetName = selectedOpponent.username || 'Unknown';
             const result = await MockContract.raid(targetName, walletAddress, 0, selectedOpponent.stats);
 
             addLog("🏰 TOWNHALL SACKED! BASE DESTROYED.");
             addLog(`💥 TOTAL DESTRUCTION: ${result.destruction.toFixed(0)}%`);
-            addLog(`💸 PAYOUT: ${result.reward} XLM`);
-
-            // Real Payout Trigger
+            
+            // Double or Nothing Logic
             if (result.success) {
+                 addLog(`💰 WINNER PAYOUT: 200 XLM (2x STAKE)`); // Hardcoded visualization match
                  try {
                      addLog("🏦 TRANSFERRING REWARD FROM BANK...");
                      await StellarService.payoutToUser(walletAddress, result.reward.toString());
@@ -186,37 +183,31 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
 
     return (
         <>
-            <div className="glass-panel p-6 rounded-2xl relative">
-                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                        <Sword className="text-red-500" /> Battle Arena
+            <div className="parchment-scroll h-96 p-8 pt-16 pb-12 relative filter drop-shadow-xl flex flex-col">
+                 <div className="flex items-center justify-between mb-4 border-b border-amber-900/20 pb-2">
+                    <h3 className="font-game text-amber-900 text-xl flex items-center gap-2">
+                        Battle Arena
                     </h3>
-                    <div className="flex items-center gap-2">
-                        <button onClick={fetchOpponents} className="p-1 hover:bg-white/10 rounded-full transition-colors">
-                            <RefreshCw size={14} className={`text-gray-400 ${loading ? 'animate-spin' : ''}`} />
-                        </button>
-                        <span className="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded-full border border-red-500/30 animate-pulse">
-                            PvP Active
-                        </span>
-                    </div>
+                    <button onClick={fetchOpponents} className="p-1 hover:bg-amber-900/10 rounded-full transition-colors">
+                        <RefreshCw size={14} className={`text-amber-800 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
                 </div>
 
-                <div className="space-y-3">
+                <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3">
                     {opponents.length === 0 && !loading && (
-                        <div className="text-center text-gray-500 py-4">No opponents found.</div>
+                        <div className="text-center text-amber-900/50 py-4 italic">No targets found.</div>
                     )}
                     
                     {opponents.map((opp) => (
-                        <div key={opp._id || opp.username} className="group bg-white/5 hover:bg-white/10 p-4 rounded-xl border border-white/5 hover:border-red-500/30 transition-all flex items-center justify-between">
+                        <div key={opp._id || opp.username} className="group flex items-center justify-between border-b border-dashed border-amber-900/30 pb-2 last:border-0 hover:bg-amber-900/5 p-2 rounded">
                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center border border-white/10 text-xs font-bold text-white">
-                                    {(opp.username || '?').substring(0, 2).toUpperCase()}
+                                <div className="w-8 h-8 rounded bg-[#8d6e63] flex items-center justify-center text-white font-bold text-xs ring-2 ring-[#3e2723]">
+                                    {(opp.username || '?').substring(0, 1).toUpperCase()}
                                 </div>
                                 <div>
-                                    <div className="text-white font-medium text-sm">{opp.username}</div>
-                                    <div className="text-xs text-gray-500 flex items-center gap-2">
-                                        <span className="flex items-center gap-1"><Shield size={10} /> {opp.stats?.defense || 0}</span>
-                                        <span className="text-green-500 font-mono text-[10px] ml-2">WIN:{opp.stats?.wins || 0}</span>
+                                    <div className="text-amber-900 font-bold text-sm leading-none">{opp.username}</div>
+                                    <div className="text-[10px] text-amber-800/70 font-mono">
+                                        DEF: {opp.stats?.defense || 0}
                                     </div>
                                 </div>
                             </div>
@@ -224,8 +215,15 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                             <button
                                 onClick={() => cooldown > 0 ? handleSkipCooldown() : initiateRaid(opp)}
                                 disabled={raiding || (user?.username === opp.username) }
-                                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                            >{cooldown > 0 ? `⚡ SKIP (${cooldown}s) - 5 XLM` : "STAKE 100 XLM"}</button>
+                                className={`
+                                    ${cooldown > 0 ? 'bg-amber-700 text-white rounded px-2 py-1 text-xs' : 'btn-stake w-24 h-12'}
+                                    disabled:opacity-50 disabled:cursor-not-allowed
+                                    flex items-center justify-center font-game text-white text-xs drop-shadow-md
+                                `}
+                            >
+                                {cooldown > 0 ? `SKIP ${cooldown}s` : ''} 
+                                {/* If btn-stake has text, leave empty. Assuming it has "STAKE". */}
+                            </button>
                         </div>
                     ))}
                 </div>

@@ -1,61 +1,123 @@
+@import url('https://fonts.googleapis.com/css2?family=Lilita+One&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --font-heading: 'Lilita One', cursive;
+    --text-gold: #fbbf24;
   }
 }
 
-@layer utilities {
-  .glass-panel {
-    @apply bg-gray-900 bg-opacity-20 backdrop-blur-lg border border-white/10 shadow-xl;
+@layer components {
+  /* Textures */
+  .bg-village {
+    background-image: url('/assets/bg_village.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
   }
 
-  .neon-text {
-    text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+  .wood-banner {
+    background-image: url('/assets/wood_banner.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
   }
-}
 
-@theme {
-  --animate-progress: progress 2s ease-in-out infinite;
+  .stone-panel {
+    background-image: url('/assets/stone_panel.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    /* rugged edges handling might need padding */
+  }
 
-  @keyframes progress {
-    0% {
-      width: 0%
-    }
+  .parchment-scroll {
+    background-image: url('/assets/parchment_scroll.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+  }
+  
+  .gold-frame {
+    background-image: url('/assets/gold_frame.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
 
-    50% {
-      width: 100%
-    }
+  /* Buttons */
+  .btn-train {
+    background-image: url('/assets/btn_train.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    transition: all 0.1s ease;
+  }
+  .btn-train:active {
+    transform: scale(0.95);
+    filter: brightness(0.9);
+  }
 
-    100% {
-      width: 0%
-    }
+  .btn-stake {
+    background-image: url('/assets/btn_stake.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+    transition: all 0.1s ease;
+  }
+  .btn-stake:hover {
+    transform: scale(1.05) rotate(-2deg);
+    filter: drop-shadow(0 6px 12px rgba(255, 165, 0, 0.4));
+  }
+  .btn-stake:active {
+    transform: scale(0.95);
+  }
+
+  /* Chests */
+  .chest-gold {
+     background-image: url('/assets/chest_gold.png');
+     background-size: contain;
+     background-repeat: no-repeat;
+     background-position: center;
+  }
+  .chest-elixir {
+     background-image: url('/assets/chest_elixir.png');
+     background-size: contain;
+     background-repeat: no-repeat;
+     background-position: center;
+  }
+
+  /* Typography */
+  .font-game {
+    font-family: var(--font-heading);
+    letter-spacing: 0.05em;
+    text-shadow: 2px 2px 0px #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  }
+  
+  .text-stroke {
+    -webkit-text-stroke: 1.5px black;
+    paint-order: stroke fill;
   }
 }
 
 body {
-  @apply bg-background text-foreground antialiased;
-  background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 100%);
-  min-height: 100vh;
+  @apply bg-village text-white antialiased min-h-screen overflow-x-hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #2D1B0E; 
+}
+::-webkit-scrollbar-thumb {
+  background: #8B5E3C; 
+  border-radius: 5px;
+  border: 2px solid #2D1B0E;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A06F4B; 
 }

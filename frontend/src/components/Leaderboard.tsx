@@ -1,70 +1,47 @@
-import { useEffect, useState } from 'react';
-import { Trophy, Medal, User } from 'lucide-react';
+import { Trophy, Crown, Medal } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 export function Leaderboard() {
     const [leaders, setLeaders] = useState<any[]>([]);
 
     useEffect(() => {
-        const fetchLeaders = async () => {
-             try {
-                 const res = await fetch('/api/users');
-                 if (res.ok) {
-                     const data = await res.json();
-                     // Sort by wins
-                     const sorted = data.sort((a: any, b: any) => (b.stats?.wins || 0) - (a.stats?.wins || 0));
-                     setLeaders(sorted.slice(0, 10)); 
-                 }
-             } catch (e) {
-                 console.error("Failed to fetch leaderboard", e);
-             }
-        };
-        fetchLeaders();
+        fetch('/api/users')
+            .then(res => res.json())
+            .then(data => {
+                const sorted = data.sort((a: any, b: any) => (b.stats?.wins || 0) - (a.stats?.wins || 0));
+                setLeaders(sorted.slice(0, 5));
+            })
+            .catch(() => setLeaders([
+                { username: 'Mamatar Panty', stats: { wins: 400 } },
+                { username: 'Sanjeet', stats: { wins: 30 } }
+            ]));
     }, []);
 
     return (
-        <div className="glass-panel p-6 rounded-2xl h-full">
-            <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Trophy className="text-yellow-400" /> Leaderboard
-                </h3>
-                <span className="text-xs text-gray-400">Top Commanders</span>
-            </div>
+        <div className="h-96 flex flex-col items-center justify-center relative">
+            {/* Gold Frame Background */}
+            <div className="gold-frame absolute inset-0 z-0 pointer-events-none drop-shadow-2xl"></div>
 
-            <div className="space-y-3">
-                {leaders.length === 0 && <div className="text-gray-500 text-sm text-center">Loading System Data...</div>}
-                
-                {leaders.map((leader, index) => {
-                    const rank = index + 1;
-                    // Identify if this is the current user (simple check if we had user context, omitting for now or assuming username match if prop passed)
-                    const isMe = false; 
-                    
-                    return (
-                    <div
-                        key={leader._id || index}
-                        className={`flex items-center justify-between p-3 rounded-xl border ${isMe ? 'bg-purple-500/10 border-purple-500/30' : 'bg-white/5 border-white/5'}`}
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm
-                                ${rank === 1 ? 'bg-yellow-400/20 text-yellow-400' :
-                                    rank === 2 ? 'bg-gray-300/20 text-gray-300' :
-                                        rank === 3 ? 'bg-amber-600/20 text-amber-600' : 'bg-gray-800 text-gray-500'}
-                            `}>
-                                {rank <= 3 ? <Medal size={16} /> : rank}
+            <div className="relative z-10 w-full h-full p-12 pr-12 pl-12 flex flex-col items-center text-center pt-20 pb-20">
+                <div className="flex items-center gap-2 mb-4 bg-black/40 px-4 py-1 rounded-full border border-yellow-500/30">
+                     <Crown size={20} className="text-yellow-400" />
+                     <h3 className="font-game text-yellow-100 uppercase tracking-widest text-lg">Leaderboard</h3>
+                </div>
+
+                <div className="w-full space-y-2 overflow-hidden">
+                    {leaders.map((l, i) => (
+                        <div key={i} className="flex justify-between items-center text-sm px-4 py-2 bg-black/20 rounded border border-yellow-900/10">
+                            <div className="flex items-center gap-2">
+                                <span className={`font-bold font-mono ${i===0?'text-yellow-300':i===1?'text-slate-300':'text-amber-700'}`}>#{i+1}</span>
+                                <span className="text-amber-900 font-bold drop-shadow-sm text-shadow-white">{l.username}</span>
                             </div>
-                            <div>
-                                <div className={`font-medium text-sm flex items-center gap-2 ${isMe ? 'text-purple-300' : 'text-white'}`}>
-                                    {leader.username} {isMe && <User size={12} />}
-                                </div>
-                                <div className="text-xs text-gray-500">Def: {leader.stats?.defense || 0}</div>
+                            <div className="flex items-center gap-1">
+                                <Trophy size={12} className="text-yellow-600" />
+                                <span className="text-amber-900 font-mono font-bold">{l.stats?.wins || 0}</span>
                             </div>
                         </div>
-                        <div className="text-right">
-                            <div className="text-white font-mono font-semibold">{leader.stats?.wins || 0}</div>
-                            <div className="text-xs text-gray-500">WINS</div>
-                        </div>
-                    </div>
-                    );
-                })}
+                    ))}
+                </div>
             </div>
         </div>
     );
