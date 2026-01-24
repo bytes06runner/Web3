@@ -39,9 +39,9 @@ export const UpgradeShieldButton: React.FC<Props> = ({ walletAddress, onUpgrade,
                     className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] group-hover:brightness-110"
                 />
                 
-                {/* Cost Label - Positioned at Bottom to avoid overlap */}
-                <div className="absolute inset-x-0 bottom-1 flex justify-center">
-                     <span className="font-game text-amber-400 text-[10px] md:text-xs tracking-widest bg-black/90 px-4 py-0.5 rounded-full border border-amber-500/30 shadow-lg backdrop-blur-sm">
+                {/* Cost Label - FORCE BOTTOM */}
+                <div className="absolute inset-x-0 bottom-0 flex justify-center translate-y-1/2">
+                     <span className="font-game text-amber-400 text-[10px] md:text-xs tracking-widest bg-black/90 px-4 py-1 rounded-full border border-amber-500/30 shadow-lg backdrop-blur-sm z-10">
                         COST: 10 XLM
                      </span>
                 </div>
