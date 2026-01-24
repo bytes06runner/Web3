@@ -231,6 +231,7 @@ function App() {
                     onToast={(type: ToastType, msg: string) => addToast(type, msg)}
                     walletAddress={walletAddress}
                     user={user}
+                    xlmBalance={xlmBalance}
                 />
               </div>
               <div className="flex-1">

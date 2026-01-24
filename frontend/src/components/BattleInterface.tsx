@@ -10,10 +10,12 @@ interface BattleInterfaceProps {
     result: { success: boolean; destruction: number; reward: number } | null;
     onLaunch: () => void;
     isRaiding: boolean;
+    balance: string;
+    topCommanders: any[];
 }
 
 export const BattleInterface: React.FC<BattleInterfaceProps> = ({ 
-    isOpen, onClose, attacker, defender, logs, result, onLaunch, isRaiding
+    isOpen, onClose, attacker, defender, logs, result, onLaunch, isRaiding, balance, topCommanders
 }) => {
     const [visibleLogs, setVisibleLogs] = useState<string[]>([]);
     const logEndRef = useRef<HTMLDivElement>(null);
@@ -46,7 +48,7 @@ export const BattleInterface: React.FC<BattleInterfaceProps> = ({
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
             {/* Main Container - Cyber Noir Border */}
-            <div className="relative w-full max-w-5xl h-[80vh] bg-[#050b14] border border-cyan-500/30 rounded-lg shadow-[0_0_50px_rgba(6,182,212,0.15)] flex flex-col overflow-hidden">
+            <div className="relative w-full h-full md:h-[80vh] md:max-w-5xl bg-[#050b14] border border-cyan-500/30 rounded-lg shadow-[0_0_50px_rgba(6,182,212,0.15)] flex flex-col overflow-hidden">
                 
                 {/* Header Accents */}
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50"></div>
@@ -66,18 +68,18 @@ export const BattleInterface: React.FC<BattleInterfaceProps> = ({
                 </div>
 
                 {/* Main Content Grid */}
-                <div className="flex-1 grid grid-cols-12 gap-6 p-6 overflow-hidden">
+                <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-6 p-6 overflow-y-auto md:overflow-hidden">
                     
                     {/* Left Panel: Stats & Info (3 Cols) */}
-                    <div className="col-span-3 border-r border-white/5 pr-6 flex flex-col gap-6">
+                    <div className="col-span-3 border-b md:border-b-0 md:border-r border-white/5 pb-6 md:pb-0 md:pr-6 flex flex-col gap-6">
                         {/* Balance Block */}
                         <div className="bg-[#0a1120] p-4 rounded-lg border-l-2 border-cyan-500">
                             <h3 className="text-gray-400 text-xs font-mono mb-1">BALANCE</h3>
-                            <div className="text-2xl text-white font-bold tracking-tight">10,000 XLM</div>
+                            <div className="text-2xl text-white font-bold tracking-tight">{balance} XLM</div>
                         </div>
                         <div className="bg-[#0a1120] p-4 rounded-lg border-l-2 border-cyan-500/50">
-                            <h3 className="text-gray-400 text-xs font-mono mb-1">STAKED</h3>
-                            <div className="text-2xl text-white font-bold tracking-tight">5,000 $SHARD</div>
+                            <h3 className="text-gray-400 text-xs font-mono mb-1">STAMINA</h3>
+                            <div className="text-2xl text-white font-bold tracking-tight">100 / 100</div>
                         </div>
 
                         {/* Attacker Stats */}
@@ -207,7 +209,7 @@ export const BattleInterface: React.FC<BattleInterfaceProps> = ({
                     </div>
 
                     {/* Right Panel: Commander Stats (3 Cols) */}
-                    <div className="col-span-3 border-l border-white/5 pl-6 flex flex-col gap-6">
+                    <div className="col-span-3 border-t md:border-t-0 md:border-l border-white/5 pt-6 md:pt-0 md:pl-6 flex flex-col gap-6">
                         <div className="bg-[#0a1120] border border-red-500/20 rounded-lg p-4">
                             <h3 className="text-red-400 text-xs font-mono uppercase border-b border-red-500/20 pb-2 mb-3">Target Intel</h3>
                             <div className="space-y-2">
@@ -227,16 +229,10 @@ export const BattleInterface: React.FC<BattleInterfaceProps> = ({
                                 <Trophy size={12} className="text-yellow-500" /> Top Commanders
                             </h3>
                             <div className="space-y-1 flex-1 overflow-y-auto pr-1">
-                                {[
-                                    { name: 'CRYPTO_KING', score: 186 },
-                                    { name: 'SOROBAN_SAMURAI', score: 105 },
-                                    { name: 'DEFI_DIVA', score: 86 },
-                                    { name: 'XLM_WHALE', score: 72 },
-                                    { name: 'RUST_DEV', score: 65 },
-                                ].map((p, i) => (
+                                {topCommanders.map((p, i) => (
                                     <div key={i} className="flex justify-between items-center bg-white/5 p-2 rounded hover:bg-white/10 cursor-pointer">
-                                        <span className={`text-xs ${i===0 ? 'text-yellow-400' : 'text-gray-300'}`}>{p.name}</span>
-                                        <span className="text-xs font-mono text-cyan-500">{p.score}</span>
+                                        <span className={`text-xs ${i===0 ? 'text-yellow-400' : 'text-gray-300'}`}>{p.username || 'Unknown'}</span>
+                                        <span className="text-xs font-mono text-cyan-500">{p.stats?.wins || 0}</span>
                                     </div>
                                 ))}
                             </div>

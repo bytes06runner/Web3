@@ -8,9 +8,10 @@ interface BattleArenaProps {
     onToast?: (type: 'success' | 'error', msg: string) => void;
     walletAddress: string | null;
     user: any;
+    xlmBalance: string;
 }
 
-export function BattleArena({ refreshGame, onToast, walletAddress, user }: BattleArenaProps) {
+export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBalance }: BattleArenaProps) {
     const [opponents, setOpponents] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
@@ -168,7 +169,9 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user }: Battl
 
             {selectedOpponent && (
                 <BattleInterface 
-                    isOpen={modalOpen} 
+                    isOpen={modalOpen}
+                    balance={xlmBalance}
+                    topCommanders={opponents} 
                     onClose={() => setModalOpen(false)}
                     onLaunch={handleLaunch}
                     isRaiding={raiding}

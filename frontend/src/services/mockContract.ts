@@ -97,66 +97,94 @@ export const MockContract = {
         return state;
     },
 
-        raid: async (targetName: string, userPublicKey: string, troopCount: number = 10, defenderStats: any = { defense: 50 }) => {
+            raid: async (targetName: string, userPublicKey: string, troopCount: number = 10, defenderStats: any = { defense: 50, unit: 'FORTRESS_V1' }) => {
         const state = MockContract.getState();
         
+        // --- STAMINA CHECK ---
+        const STAMINA_COST = 10;
+        if (state.stamina < STAMINA_COST) {
+            throw new Error("Insufficient Stamina! Rest needed.");
+        }
+        state.stamina -= STAMINA_COST;
+        
         const TROOP_ATK = 15;
-        const totalAttack = troopCount * TROOP_ATK;
+        let totalAttack = troopCount * TROOP_ATK;
         const defensePower = (defenderStats.defense || 50) * 1.5; 
 
-        // Initial Stamina/Troop Check
-        if (state.troopCount < troopCount) {
-             throw new Error("Not enough troops in garrison!");
+        // --- UNIT ADVANTAGE SYSTEM ---
+        // CYBER_UNIT > FORTRESS_V1 > STEALTH_OPS > CYBER_UNIT
+        const myUnit = 'CYBER_UNIT'; // Default for now
+        const defUnit = defenderStats.unit || 'FORTRESS_V1';
+        
+        let advantageMsg = "";
+        let advantageMult = 1.0;
+
+        if (myUnit === 'CYBER_UNIT' && defUnit === 'FORTRESS_V1') {
+            advantageMult = 1.25;
+            advantageMsg = "⚡ UNIT ADVANTAGE: Cyber Unit counters Fortress!";
+        } else if (defUnit === 'CYBER_UNIT') { 
+            // If we are fighting a cyber unit (mirror), no advantage
+            advantageMult = 1.0;
         }
 
-        // --- PROBABILITY LOGIC ---
-        // Base 50% chance
-        // Adjust by (Attack - Defense) / Scale
-        // If Attack = 150, Defense = 75 (High Advantage) -> +0.3 -> 80% Win
-        // If Attack = 150, Defense = 300 (High Disadvantage) -> -0.3 -> 20% Win
+        totalAttack = totalAttack * advantageMult;
+
+        // Low Stamina Penalty
+        if (state.stamina < 20) {
+            totalAttack *= 0.5;
+            advantageMsg += " (⚠️ Low Stamina: Attack Halved)";
+        }
+
+        // --- CRITICAL HIT ---
+        const isCrit = Math.random() < 0.10; // 10% Chance
         
+        // --- PROBABILITY LOGIC ---
         const diff = totalAttack - defensePower;
         const scale = Math.max(totalAttack, defensePower) || 1;
         let winChance = 0.5 + (diff / (scale * 2)); 
         
-        // Clamp 10% - 90%
         winChance = Math.max(0.1, Math.min(0.9, winChance));
         
         const roll = Math.random();
-        let success = roll < winChance;
+        // Crit guarantees win
+        let success = isCrit || (roll < winChance);
         
         let destruction = 0;
-        let phase = "Ambush"; // Simplified for now
+        let phase = "Ambush"; 
         let logMsg = "";
         let reward = 0;
 
         if (success) {
             // Victory
-            // Calculate destruction based on margin
-            const margin = winChance - roll; // Higher margin = more destruction
-            if (margin > 0.3) destruction = 100;
-            else if (margin > 0.1) destruction = 50;
-            else destruction = 30;
-
-            logMsg = `⚔️ Raid on ${targetName} SUCCESS! (Chance: ${(winChance*100).toFixed(0)}%) - ${destruction}% Destruction`;
+            const margin = winChance - roll; 
+            if (isCrit) {
+                destruction = 100;
+                logMsg = `💥 CRITICAL HIT! DEFENSE BYPASSED! 100% DESTRUCTION!`;
+            } else {
+                 if (margin > 0.3) destruction = 100;
+                 else if (margin > 0.1) destruction = 75;
+                 else destruction = 40;
+                 
+                 logMsg = `⚔️ Raid SUCCESS! ${advantageMsg} (Chance: ${(winChance*100).toFixed(0)}%) - ${destruction}% Dmg`;
+            }
         } else {
-            destruction = 0;
-            logMsg = `🛡️ Raid on ${targetName} FAILED. Defense held strong. (Chance: ${(winChance*100).toFixed(0)}%)`;
+            destruction = Math.floor(Math.random() * 10); // Minimal scratch damage
+            logMsg = `🛡️ Raid FAILED. Defense held. ${advantageMsg} (Chance: ${(winChance*100).toFixed(0)}%)`;
         }
         
         let payoutPct = 0;
-        if (destruction >= 100) payoutPct = 90; // 90 XLM
-        else if (destruction >= 50) payoutPct = 50;
-        else if (destruction >= 30) payoutPct = 20;
+        if (destruction >= 100) payoutPct = 100; 
+        else if (destruction >= 75) payoutPct = 50;
+        else if (destruction >= 40) payoutPct = 25;
         
-        reward = payoutPct; // Simple 1:1 for now or pool based
+        reward = payoutPct; 
         
         if (success && reward > 0) {
              try {
                 // await StellarService.payoutToUser(userPublicKey, reward.toString());
                 state.commandTokens += reward * 10;
-                state.yieldEarned += reward; // Simulate XLM gain in yield tracker too? Or separate.
-                state.history.unshift(`✅ Raid Victory! Looted ${reward} XLM`);
+                state.yieldEarned += reward; 
+                state.history.unshift(`✅ Victory! Looted ${reward} XLM`);
              } catch(e) {
                  state.history.unshift(`❌ Payout Simulated Failed`);
              }
@@ -165,7 +193,7 @@ export const MockContract = {
         state.history.unshift(logMsg);
 
         // Deduct Troops
-        const lossRate = success ? 0.1 : 0.4;
+        const lossRate = success ? 0.05 : 0.3;
         state.troopCount = Math.max(0, Math.floor(state.troopCount * (1 - lossRate)));
         
         MockContract.saveState(state);
