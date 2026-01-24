@@ -1,49 +1,82 @@
-import { Trophy, Crown, Medal } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Trophy, Crown, RefreshCw } from 'lucide-react';
 
 export function Leaderboard() {
-    const [leaders, setLeaders] = useState<any[]>([]);
+    const [players, setPlayers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        fetch('/api/users')
-            .then(res => res.json())
-            .then(data => {
-                const sorted = data.sort((a: any, b: any) => (b.stats?.wins || 0) - (a.stats?.wins || 0));
-                setLeaders(sorted.slice(0, 5));
-            })
-            .catch(() => setLeaders([
-                { username: 'Mamatar Panty', stats: { wins: 400 } },
-                { username: 'Sanjeet', stats: { wins: 30 } }
-            ]));
+        loadData();
+        // Poll for updates every 10 seconds
+        const interval = setInterval(loadData, 10000);
+        return () => clearInterval(interval);
     }, []);
 
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            // Fetch from REAL MongoDB via Netlify Functions
+            const response = await fetch('/api/users');
+            if (response.ok) {
+                const users = await response.json();
+                // Format for leaderboard display
+                const formatted = users.map((user: any, index: number) => ({
+                    rank: index + 1,
+                    username: user.username,
+                    score: user.stats?.wins || 0,
+                    wallet: user.walletAddress?.substring(0, 8) + '...'
+                }));
+                setPlayers(formatted);
+            }
+        } catch (err) {
+            console.error('Failed to fetch leaderboard:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
-        <div className="relative w-full aspect-[4/5] max-h-[500px] flex flex-col items-center justify-center p-[15%]">
-            {/* Gold Frame Background */}
-            <div className="gold-frame absolute inset-0 z-0 pointer-events-none drop-shadow-2xl"></div>
-
-            {/* Dark Backdrop for Readability - Inset optimized for the frame asset */}
-            <div className="absolute inset-[15%] bg-[#121212]/90 backdrop-blur-sm z-0 rounded-xl border border-yellow-900/30"></div>
-
-            <div className="relative z-10 w-full h-full flex flex-col items-center text-center">
-                <div className="flex items-center gap-2 mb-4 bg-black/80 px-4 py-1 rounded-full border border-yellow-500/50 shadow-lg mt-2">
-                     <Crown size={16} className="text-yellow-400" />
-                     <h3 className="font-game text-yellow-100 uppercase tracking-widest text-sm md:text-base">Leaderboard</h3>
+        <div className="relative w-full max-w-sm mx-auto animate-in zoom-in duration-500">
+            <div className="gold-frame p-[14%] pb-[16%] drop-shadow-2xl filter brightness-110">
+                
+                {/* Header */}
+                <div className="flex items-center justify-center gap-2 mb-4">
+                    <Crown className="text-yellow-400 drop-shadow-md animate-pulse" size={24} />
+                    <h2 className="font-game text-xl text-[#fbbf24] tracking-widest text-stroke uppercase">Leaderboard</h2>
+                    <button onClick={loadData} className="ml-2 p-1 hover:bg-white/10 rounded-full">
+                        <RefreshCw size={14} className={`text-yellow-400 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
                 </div>
 
-                <div className="w-full space-y-2 overflow-hidden flex-1 relative">
-                    {leaders.map((l, i) => (
-                        <div key={i} className="flex justify-between items-center text-xs md:text-sm px-3 py-2 bg-white/5 rounded border border-white/5 hover:bg-white/10 transition-colors">
-                            <div className="flex items-center gap-2">
-                                <span className={`font-bold font-mono ${i===0?'text-yellow-400':i===1?'text-slate-300':'text-amber-700'}`}>#{i+1}</span>
-                                <span className="text-gray-200 font-bold tracking-wide truncate max-w-[100px]">{l.username}</span>
+                {/* List */}
+                <div className="space-y-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
+                    {players.length === 0 && !loading && (
+                        <div className="text-center text-yellow-600/50 py-4 text-sm">No warriors yet...</div>
+                    )}
+                    {players.map((player) => (
+                        <div key={player.rank} className={`flex items-center justify-between p-2 rounded border-b border-[#ffffff10] ${player.rank === 1 ? 'bg-yellow-500/20' : 'hover:bg-white/5'}`}>
+                            <div className="flex items-center gap-3">
+                                <div className={`w-6 h-6 flex items-center justify-center font-bold font-mono rounded-full text-xs
+                                    ${player.rank === 1 ? 'bg-yellow-500 text-black shadow-lg scale-110' : 
+                                      player.rank === 2 ? 'bg-gray-400 text-black' : 
+                                      player.rank === 3 ? 'bg-orange-700 text-white' : 'bg-[#222] text-gray-500'}
+                                `}>
+                                    {player.rank}
+                                </div>
+                                <span className={`font-bold text-sm ${player.rank === 1 ? 'text-yellow-300' : 'text-gray-200'}`}>
+                                    {player.username}
+                                </span>
                             </div>
-                            <div className="flex items-center gap-1 text-yellow-500/80">
-                                <Trophy size={10} />
-                                <span className="font-mono font-bold">{l.stats?.wins || 0}</span>
+                            <div className="flex items-center gap-1 text-yellow-500 font-mono font-bold text-sm">
+                                <Trophy size={12} />
+                                {player.score}
                             </div>
                         </div>
                     ))}
+                </div>
+
+                <div className="text-center mt-4">
+                    <p className="text-[10px] text-yellow-600/60 uppercase tracking-widest font-bold">Live from MongoDB</p>
                 </div>
             </div>
         </div>

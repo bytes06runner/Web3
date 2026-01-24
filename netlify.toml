@@ -1,0 +1,43 @@
+[build]
+  publish = "frontend/dist"
+  command = "cd frontend && npm install && npm run build"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  included_files = ["api/**"]
+
+# API Redirects - Route /api/* to Netlify Functions
+[[redirects]]
+  from = "/api/auth/login"
+  to = "/.netlify/functions/login"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/register"
+  to = "/.netlify/functions/register"
+  status = 200
+
+[[redirects]]
+  from = "/api/users"
+  to = "/.netlify/functions/users"
+  status = 200
+
+[[redirects]]
+  from = "/api/users/*"
+  to = "/.netlify/functions/users"
+  status = 200
+
+[[redirects]]
+  from = "/api/update_stats"
+  to = "/.netlify/functions/update-stats"
+  status = 200
+
+# SPA Fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

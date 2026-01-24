@@ -3,7 +3,6 @@ import { RefreshCw, Wallet } from 'lucide-react';
 import { MockContract } from '../services/mockContract';
 import { BattleInterface } from './BattleInterface';
 import { StellarService } from '../services/stellarService';
-// Removed: FreighterTransaction import (We use real wallet now)
 
 interface BattleArenaProps {
     refreshGame: () => void;
@@ -18,14 +17,13 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
     const [opponents, setOpponents] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     
-    // UI Logic
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedOpponent, setSelectedOpponent] = useState<any>(null);
     const [raiding, setRaiding] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
     const [battleResult, setBattleResult] = useState<any>(null);
     const [cooldown, setCooldown] = useState(0);
-    const [awaitingWallet, setAwaitingWallet] = useState(false); // New state for wallet interaction
+    const [awaitingWallet, setAwaitingWallet] = useState(false);
 
     const currentDps = ((troops?.archers||0)*3) + ((troops?.infantry||0)*5) + ((troops?.giants||0)*7);
 
@@ -42,20 +40,27 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
         return () => clearInterval(interval);
     }, [raiding, modalOpen]);
 
+    // Fetch opponents from REAL MongoDB
     const fetchOpponents = async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/users');
-            if (res.ok) {
-                const data = await res.json();
-                setOpponents(data.slice(0, 5));
+            const response = await fetch('/api/users');
+            if (response.ok) {
+                const users = await response.json();
+                // Filter out current user
+                const filtered = users.filter((u: any) => u.username !== user?.username).slice(0, 5);
+                setOpponents(filtered.length > 0 ? filtered : [{ username: 'Training_Dummy', stats: { defense: 50 } }]);
             } else {
-                 setOpponents([{ username: 'Satoshi_Vault', stats: { defense: 80, wins: 12 } }]);
+                setOpponents([{ username: 'Training_Dummy', stats: { defense: 50 } }]);
             }
-        } catch (e) { console.error(e); } finally { setLoading(false); }
+        } catch (e) {
+            console.error(e);
+            setOpponents([{ username: 'Training_Dummy', stats: { defense: 50 } }]);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    // Step 1: Open Battle Interface (Pre-Raid View)
     const initiateRaid = (opponent: any) => {
         if (!walletAddress) { onToast?.('error', 'Connect Wallet to Raid'); return; }
         setSelectedOpponent(opponent);
@@ -65,11 +70,8 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
         setAwaitingWallet(false);
     };
 
-    // Step 2: Trigger REAL Transactions via Freighter
     const triggerRealTransaction = async () => {
         if (!walletAddress) return;
-        
-        // 1. Balance Check (Soft check, real fail happens on chain if insufficient)
         if (parseFloat(xlmBalance || '0') < 100) {
             onToast?.('error', 'Insufficient Balance! Need 100 XLM.');
             return;
@@ -79,14 +81,12 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
             setAwaitingWallet(true);
             onToast?.('info', 'Please sign the transaction in Freighter...');
             
-            // 2. Call Stellar Service (Triggers Extension)
-            // This promise resolves only when user signs and tx is submitted
             const txHash = await StellarService.stakeRaid(walletAddress);
             
             if (txHash) {
                 onToast?.('success', 'Stake Confirmed on Ledger!');
                 setAwaitingWallet(false);
-                executeRaidLogic(); // Proceed to game logic
+                executeRaidLogic(); 
             }
         } catch (error: any) {
             console.error("Raid Stake Error:", error);
@@ -94,24 +94,19 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
             if (error.message?.includes('cancelled')) {
                 onToast?.('info', 'Transaction Cancelled');
             } else {
-                onToast?.('error', 'Stake Transaction Failed. Check console.');
+                onToast?.('error', 'Stake Transaction Failed.');
             }
         }
     };
 
-    // Step 3: Execute Raid Logic (Visuals + Mock Contract Calculation)
     const executeRaidLogic = async () => {
         setRaiding(true);
         setLogs(['✅ STAKE CONFIRMED (100 XLM)', 'initiating_handshake...', 'connecting_to_node...']);
-        
-        // Update mock balance visual
         MockContract.deposit(-100); 
         refreshGame();
 
-        // Artificial delay for tension
         setTimeout(async () => {
             try {
-                // Execute Raid
                 const result = await MockContract.raid(
                     selectedOpponent?.username || 'Target',
                     walletAddress || '0x',
@@ -121,12 +116,26 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
 
                 const logLines = result.log.split('\n');
                 let currentLine = 0;
-                const interval = setInterval(() => {
+                const interval = setInterval(async () => {
                     if (currentLine >= logLines.length) {
                         clearInterval(interval);
                         setBattleResult(result);
                         setRaiding(false);
-                        refreshGame(); // Get rewards
+                        
+                        // SYNC WITH MONGODB BACKEND
+                        try {
+                            await fetch('/api/update_stats', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    username: user?.username,
+                                    action: result.success ? 'win' : 'loss',
+                                    amount: result.success ? 200 : 100
+                                })
+                            });
+                        } catch (e) { console.error('Failed to sync stats:', e); }
+
+                        refreshGame(); 
                     } else {
                         setLogs(prev => [...prev, logLines[currentLine]]);
                         currentLine++;
@@ -151,12 +160,10 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
         } catch (e: any) { onToast?.('error', 'Payment Failed'); }
     };
 
-
     return (
         <>
-            {/* List View */}
             <div className="parchment-scroll relative w-full aspect-[3/4] max-h-[500px] flex flex-col p-[12%] pb-[15%] filter drop-shadow-xl">
-                 <div className="flex items-center justify-between mb-2 border-b-2 border-amber-950/20 pb-2">
+                <div className="flex items-center justify-between mb-2 border-b-2 border-amber-950/20 pb-2">
                     <h3 className="font-game text-amber-950 text-xl md:text-2xl drop-shadow-sm">
                         Battle Arena
                     </h3>
@@ -172,7 +179,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                     
                     {opponents.map((opp) => (
                         <div key={opp._id || opp.username} className="flex items-center justify-between border-b border-dashed border-amber-900/30 pb-2 last:border-0 p-1 rounded hover:bg-amber-900/5">
-                             <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2">
                                 <div className="w-8 h-8 rounded bg-[#5d4037] flex items-center justify-center text-[#d7ccc8] font-bold text-sm border border-[#3e2723]">
                                     {(opp.username || '?').substring(0, 1).toUpperCase()}
                                 </div>
@@ -186,7 +193,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
 
                             <button
                                 onClick={() => cooldown > 0 ? handleSkipCooldown() : initiateRaid(opp)}
-                                disabled={raiding || (user?.username === opp.username) }
+                                disabled={raiding || (user?.username === opp.username)}
                                 className={`
                                     ${cooldown > 0 ? 'bg-amber-700 text-white rounded px-2 py-0.5 text-[10px]' : 'w-20 h-10 relative group'}
                                     disabled:opacity-50 disabled:cursor-not-allowed
@@ -201,7 +208,6 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                 </div>
             </div>
 
-            {/* Battle Interface Modal w/ Wallet Awaiting State */}
             {selectedOpponent && (
                 <div className="relative z-50">
                     <BattleInterface 
@@ -209,7 +215,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                         balance={xlmBalance}
                         topCommanders={opponents} 
                         onClose={() => setModalOpen(false)}
-                        onLaunch={triggerRealTransaction} // Triggers Real Freighter
+                        onLaunch={triggerRealTransaction}
                         isRaiding={raiding}
                         attacker={{ name: user?.username || 'YOU', power: currentDps, unit: 'V3_ARMY' }}
                         defender={{ name: selectedOpponent.username, defense: selectedOpponent.stats?.defense || 50, unit: 'FORTRESS_V3' }}
@@ -217,16 +223,12 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                         result={battleResult}
                     />
                     
-                    {/* Wallet Awaiting Overlay */}
                     {awaitingWallet && modalOpen && (
                         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
                             <div className="bg-stone-900 border-2 border-amber-500 rounded-xl p-6 flex flex-col items-center animate-bounce-slow">
                                 <Wallet size={48} className="text-amber-500 mb-4 animate-pulse" />
                                 <h3 className="text-white font-game text-xl mb-2">CHECK YOUR WALLET</h3>
-                                <p className="text-stone-400 text-sm mb-4">Please sign the transaction in Freighter</p>
-                                <div className="h-1 w-32 bg-stone-800 rounded-full overflow-hidden">
-                                     <div className="h-full bg-amber-500 animate-progress"></div>
-                                </div>
+                                <p className="text-stone-400 text-sm mb-4">Sign the transaction in Freighter</p>
                             </div>
                         </div>
                     )}

@@ -1,31 +1,51 @@
-import React from 'react';
-import { Scroll, Clock, TrendingUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Scroll, Clock, ShieldAlert, Coins, Swords } from 'lucide-react'; // Added helpful icons
+import { DataService } from '../services/dataService';
 
-interface ActivityLogProps {
-    history: string[];
-}
+export function ActivityLog({ history }: { history?: any[] }) {
+    const [fullLogs, setFullLogs] = useState<any[]>([]);
 
-export const ActivityLog: React.FC<ActivityLogProps> = ({ history }) => {
+    useEffect(() => {
+        loadLogs();
+        const interval = setInterval(loadLogs, 3000); // Live updates
+        return () => clearInterval(interval);
+    }, [history]); // Also reload if prop changes
+
+    const loadLogs = async () => {
+        const logs = await DataService.getActivityLog();
+        setFullLogs(logs);
+    };
+
+    const getIcon = (type: string) => {
+        if (type === 'raid_loss' || type === 'raid_win') return <Swords size={12} className="text-red-400" />;
+        if (type === 'deposit') return <Coins size={12} className="text-green-400" />;
+        if (type === 'train') return <ShieldAlert size={12} className="text-blue-400" />;
+         return <Clock size={12} className="text-amber-700" />;
+    };
+
     return (
-        <div className="parchment-scroll relative w-full aspect-[3/4] max-h-[500px] flex flex-col p-[12%] pb-[15%] filter drop-shadow-xl">
-            <h3 className="font-game text-amber-950 text-center text-xl md:text-2xl mb-4 opacity-90 border-b-2 border-amber-900/20 pb-2">Activity Log</h3>
-            <div className="h-full overflow-y-auto pr-2 custom-scrollbar space-y-3">
-                {history.length === 0 && (
-                    <div className="text-center text-amber-900/40 italic text-sm mt-10">No recent activity...</div>
-                )}
-                {history.map((log, i) => (
-                    <div key={i} className="flex gap-2 items-start border-b border-amber-900/10 pb-2 last:border-0 hover:bg-amber-900/5 p-1 rounded">
-                        <div className="mt-0.5">
-                            {log.includes('Deposit') ? <TrendingUp size={12} className="text-green-800" /> :
-                             log.includes('Battle') || log.includes('RAID') ? <Scroll size={12} className="text-red-800" /> :
-                             <Clock size={12} className="text-amber-800" />}
-                        </div>
-                        <p className="text-[11px] font-serif text-amber-900 leading-tight">
-                            {log}
-                        </p>
+        <div className="parchment-scroll relative w-full aspect-[3/4] max-h-[500px] flex flex-col p-[12%] pb-[15%] filter drop-shadow-xl transition-transform hover:scale-[1.01]">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4 border-b-2 border-amber-950/20 pb-2">
+                 <div className="flex items-center gap-2">
+                    <Scroll className="text-amber-900" size={18} />
+                    <h3 className="font-game text-amber-950 text-xl md:text-2xl drop-shadow-sm">Activity Log</h3>
+                </div>
+            </div>
+
+            {/* List */}
+             <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-3">
+                {fullLogs.map((log) => (
+                    <div key={log.id} className="flex items-start gap-2 border-b border-dashed border-amber-900/10 pb-2 animate-in slide-in-from-left-2 duration-300">
+                         <div className="mt-1">{getIcon(log.type)}</div>
+                         <div>
+                             <p className="text-sm font-bold text-amber-950/90 leading-tight font-serif">{log.text}</p>
+                             <p className="text-[10px] text-amber-900/60 font-mono uppercase mt-0.5">{log.time}</p>
+                         </div>
                     </div>
                 ))}
-            </div>
+             </div>
         </div>
     );
-};
+}
