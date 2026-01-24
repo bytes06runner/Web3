@@ -1,9 +1,9 @@
-// @ts-nocheck
 import { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { MockContract } from '../services/mockContract';
 import { BattleInterface } from './BattleInterface';
 import { StellarService } from '../services/stellarService';
+import { FreighterTransaction } from './FreighterTransaction';
 
 interface BattleArenaProps {
     refreshGame: () => void;
@@ -17,7 +17,12 @@ interface BattleArenaProps {
 export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBalance, troops }: BattleArenaProps) {
     const [opponents, setOpponents] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    
+    // UI Logic
     const [modalOpen, setModalOpen] = useState(false);
+    const [detailsOpen, setDetailsOpen] = useState(false); // New state for initial details view if needed, but we used modalOpen for everything so far.
+    const [freighterOpen, setFreighterOpen] = useState(false);
+
     const [selectedOpponent, setSelectedOpponent] = useState<any>(null);
     const [raiding, setRaiding] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
@@ -51,12 +56,67 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
         } catch (e) { console.error(e); } finally { setLoading(false); }
     };
 
+    // Step 1: Open Battle Interface (Pre-Raid View)
     const initiateRaid = (opponent: any) => {
         if (!walletAddress) { onToast?.('error', 'Connect Wallet to Raid'); return; }
         setSelectedOpponent(opponent);
-        setLogs(["ready_for_deployment..."]);
+        setLogs([]);
         setBattleResult(null);
         setModalOpen(true);
+    };
+
+    // Step 2: User Clicks "RAID (100 XLM)" -> Open Freighter
+    const triggerTransaction = () => {
+        if (parseFloat(xlmBalance || '0') < 100) {
+            onToast?.('error', 'Insufficient Balance! Need 100 XLM.');
+            return;
+        }
+        setFreighterOpen(true);
+    };
+
+    // Step 3: Transaction Confirmed -> Execute Raid Logic
+    const handleLaunch = async () => {
+        setFreighterOpen(false); // Close transaction modal
+        setRaiding(true);
+        setLogs(['initiating_handshake...', 'validating_stake -100 XLM...', 'connecting_to_node...']);
+
+        // Deduck Stake Immediately (Visual only for mock)
+        MockContract.deposit(-100); 
+        refreshGame(); // Update balance ui
+        
+        // Artificial delay for tension
+        setTimeout(async () => {
+            try {
+                // Execute Raid
+                const result = await MockContract.raid(
+                    selectedOpponent?.username || 'Target',
+                    walletAddress || '0x',
+                    0, 
+                    { defense: selectedOpponent?.stats?.defense || 50 }
+                );
+
+                // Stream Logs one by one for effect? Or just dump them.
+                // The mock returns a big log string. We split it.
+                const logLines = result.log.split('\n');
+                
+                let currentLine = 0;
+                const interval = setInterval(() => {
+                    if (currentLine >= logLines.length) {
+                        clearInterval(interval);
+                        setBattleResult(result);
+                        setRaiding(false);
+                        refreshGame(); // Get rewards
+                    } else {
+                        setLogs(prev => [...prev, logLines[currentLine]]);
+                        currentLine++;
+                    }
+                }, 800); // Slow log scroll
+
+            } catch (e: any) {
+                setLogs(prev => [...prev, `ERROR: ${e.message}`]);
+                setRaiding(false);
+            }
+        }, 1500); 
     };
 
     const handleSkipCooldown = async () => {
@@ -70,11 +130,19 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
         } catch (e: any) { onToast?.('error', 'Payment Failed'); }
     };
 
-    const handleLaunch = async () => { /* Logic Preserved */ }; 
 
     return (
         <>
-            {/* Responsive Container: Maintains Aspect Ratio approx 3:4 for scroll image */}
+            {/* Freighter Simulator Modal */}
+            <FreighterTransaction 
+                isOpen={freighterOpen}
+                amount="100"
+                recipient="YieldRaiders_Contract"
+                onConfirm={handleLaunch}
+                onCancel={() => setFreighterOpen(false)}
+            />
+
+            {/* List View */}
             <div className="parchment-scroll relative w-full aspect-[3/4] max-h-[500px] flex flex-col p-[12%] pb-[15%] filter drop-shadow-xl">
                  <div className="flex items-center justify-between mb-2 border-b-2 border-amber-950/20 pb-2">
                     <h3 className="font-game text-amber-950 text-xl md:text-2xl drop-shadow-sm">
@@ -113,7 +181,6 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                                 `}
                             >
                                 {cooldown > 0 ? `SKIP` : (
-                                    // Use Horn Image properly
                                     <img src="/assets/btn_stake.png" className="w-full h-full object-contain filter drop-shadow-sm group-hover:scale-110 transition-transform" />
                                 )}
                             </button>
@@ -122,13 +189,14 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                 </div>
             </div>
 
+            {/* Battle Interface Modal */}
             {selectedOpponent && (
                 <BattleInterface 
                     isOpen={modalOpen}
                     balance={xlmBalance}
                     topCommanders={opponents} 
                     onClose={() => setModalOpen(false)}
-                    onLaunch={handleLaunch} // Note: simplified prop passing for this rewrite
+                    onLaunch={triggerTransaction} // Now triggers Freighter First!
                     isRaiding={raiding}
                     attacker={{ name: user?.username || 'YOU', power: currentDps, unit: 'V3_ARMY' }}
                     defender={{ name: selectedOpponent.username, defense: selectedOpponent.stats?.defense || 50, unit: 'FORTRESS_V3' }}
