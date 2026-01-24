@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { X, Trophy, Zap, Castle, Globe, Activity } from 'lucide-react';
+import { X, Trophy, Zap, Castle, ShieldAlert, Skull, Sword } from 'lucide-react';
 
 interface BattleInterfaceProps {
     isOpen: boolean;
@@ -17,225 +17,232 @@ interface BattleInterfaceProps {
 export const BattleInterface: React.FC<BattleInterfaceProps> = ({ 
     isOpen, onClose, attacker, defender, logs, result, onLaunch, isRaiding, balance, topCommanders
 }) => {
-    const [visibleLogs, setVisibleLogs] = useState<string[]>([]);
-    const logEndRef = useRef<HTMLDivElement>(null);
-
-    // Derived States from Logs for Animations
-    const wallBreached = logs.some(l => l.includes('WALL BREACHED'));
-    const armyEliminated = logs.some(l => l.includes('ARMY ELIMINATED'));
-    const townhallSacked = logs.some(l => l.includes('TOWNHALL SACKED'));
-
+    // --- STATE ---
+    const [showClouds, setShowClouds] = useState(false);
+    const [battleViewReady, setBattleViewReady] = useState(false);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const [defenderShake, setDefenderShake] = useState(false);
+    const [logsBuffer, setLogsBuffer] = useState<string[]>([]);
+    
+    // --- AUDIO LOGIC ---
     useEffect(() => {
-        if (!isOpen) {
-            setVisibleLogs([]);
-            return;
+        if (isOpen) {
+            // Start Music Transition
+            setShowClouds(true);
+            const audio = new Audio('/assets/combat_music.mp3'); // User provided filename
+            audio.loop = true;
+            audio.volume = 1.0;
+            audioRef.current = audio;
+            
+            // Cloud Timing Logic
+            // 0s: Click (Open) -> Clouds In
+            // 0.5s: Screen Covered -> Start Music -> Show Battle UI (hidden behind clouds)
+            // 1.5s: Clouds Out -> Reveal UI
+            
+            setTimeout(() => {
+                setBattleViewReady(true);
+                audio.play().catch(e => console.log("Audio autoplay blocked", e));
+            }, 500);
+
+            setTimeout(() => {
+                setShowClouds(false); // Part clouds
+            }, 1200);
+
+        } else {
+            // Fade Out Music
+            if (audioRef.current) {
+                const fadeOut = setInterval(() => {
+                    if (audioRef.current && audioRef.current.volume > 0.05) {
+                        audioRef.current.volume -= 0.05;
+                    } else {
+                        clearInterval(fadeOut);
+                        audioRef.current?.pause();
+                        audioRef.current = null;
+                    }
+                }, 100);
+            }
+            setBattleViewReady(false);
         }
-        setVisibleLogs(logs); 
-    }, [isOpen, logs]);
+        
+        return () => {
+             // Cleanup if unmounted abruptly
+             audioRef.current?.pause();
+        };
+    }, [isOpen]);
 
+    // --- VISUAL LOGIC ---
+    // Watch logs to trigger shakes/splats
     useEffect(() => {
-        logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [visibleLogs]);
+        if (!isOpen) { setLogsBuffer([]); return; }
+        
+        // If new logs come in, trigger effects
+        if (logs.length > logsBuffer.length) {
+            const newLog = logs[logs.length - 1];
+            if (newLog.includes('BREACHED') || newLog.includes('SACKED') || newLog.includes('PHASE')) {
+                setDefenderShake(true);
+                setTimeout(() => setDefenderShake(false), 500);
+            }
+            setLogsBuffer(logs);
+        }
+    }, [logs, isOpen]);
+
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
-            <div className="relative w-full h-full md:h-[85vh] md:max-w-5xl bg-[#050b14] border border-cyan-500/30 rounded-lg shadow-[0_0_50px_rgba(6,182,212,0.15)] flex flex-col overflow-hidden">
-                
-                {/* Header Accents */}
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50"></div>
-                <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
+            
+            {/* --- CLOUD WIPE LAYER --- */}
+            {/* We keep this mounted but transparent when not animating to avoid re-renders or just simple CSS classes */}
+            <div className={`absolute inset-0 z-[60] pointer-events-none transition-opacity duration-300 ${battleViewReady ? 'opacity-0 delay-1000' : 'opacity-100'}`}>
+                   {/* Left Cloud Bank */}
+                   <div className={`absolute inset-y-0 left-0 w-[55%] bg-white transform transition-transform duration-700 ease-in-out ${battleViewReady ? '-translate-x-full' : 'translate-x-0'}`}
+                        style={{ background: 'radial-gradient(circle at right, #e2e8f0 0%, #cbd5e1 50%, #94a3b8 100%)', clipPath: 'ellipse(100% 100% at 0% 50%)' }}></div>
+                   
+                   {/* Right Cloud Bank */}
+                   <div className={`absolute inset-y-0 right-0 w-[55%] bg-white transform transition-transform duration-700 ease-in-out ${battleViewReady ? 'translate-x-full' : 'translate-x-0'}`}
+                        style={{ background: 'radial-gradient(circle at left, #e2e8f0 0%, #cbd5e1 50%, #94a3b8 100%)', clipPath: 'ellipse(100% 100% at 100% 50%)' }}></div>
+            </div>
 
-                {/* Top Bar */}
-                <div className="flex justify-between items-center p-4 border-b border-white/5 bg-black/20">
-                    <div className="flex items-center gap-4">
-                        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse"></div>
-                        <h2 className="text-cyan-400 font-mono tracking-widest text-lg flex items-center gap-2">
-                             <Globe size={16} /> GLOBAL_NET // BATTLE_LINK_ESTABLISHED
-                        </h2>
-                    </div>
-                    <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
-                        <X size={24} />
-                    </button>
+
+            {/* --- BATTLE CONTENT (Only render when ready behind clouds or fully visible) --- */}
+            <div className={`relative w-full h-full bg-black/80 backdrop-blur-sm flex items-center justify-center transition-opacity duration-500 ${battleViewReady ? 'opacity-100' : 'opacity-0'}`}>
+                
+                {/* Background Image: Fantasy Battlefield */}
+                <div className="absolute inset-0 z-0">
+                    {/* Placeholder for Fantasy Village BG - Darkened */}
+                    <div className="w-full h-full bg-gradient-to-br from-[#1a0f0a] via-[#2d1b14] to-[#0f172a]"></div> 
+                    <div className="absolute inset-0 bg-black/60"></div>
                 </div>
 
-                {/* Main Content Grid */}
-                <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-6 p-6 overflow-y-auto md:overflow-hidden">
+                {/* --- MAIN UI CONTAINER: STONE TABLET --- */}
+                <div className="relative z-10 w-[95%] max-w-6xl aspect-video md:aspect-[21/9] bg-[#2d2d2d] rounded-xl border-[6px] border-[#5d4037] shadow-2xl flex overflow-hidden">
                     
-                    {/* Left Panel: Stats */}
-                    <div className="col-span-3 border-b md:border-b-0 md:border-r border-white/5 pb-6 md:pb-0 md:pr-6 flex flex-col gap-6">
-                        <div className="bg-[#0a1120] p-4 rounded-lg border-l-2 border-cyan-500">
-                            <h3 className="text-gray-400 text-xs font-mono mb-1">BALANCE</h3>
-                            <div className="text-2xl text-white font-bold tracking-tight">{balance} XLM</div>
-                        </div>
-                        
-                        <div className="mt-auto">
-                            <h3 className="text-cyan-400 font-mono text-sm mb-4 border-b border-cyan-500/20 pb-2">ATTACKER STATUS</h3>
-                            <div className="space-y-3">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">UNIT</span>
-                                    <span className="text-white">{attacker.unit}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-400">TOTAL DPS</span>
-                                    <span className="text-cyan-300 font-mono text-xl">{attacker.power}</span>
-                                </div>
-                            </div>
-                        </div>
+                    {/* TOP BAR: Header */}
+                    <div className="absolute top-0 inset-x-0 h-16 bg-[#1a1a1a] border-b-4 border-[#3e2723] flex justify-between items-center px-6 z-20">
+                         <div className="flex items-center gap-3">
+                             <div className="bg-red-900/50 p-1 rounded border border-red-500/30 animate-pulse">
+                                <Sword size={20} className="text-red-400" />
+                             </div>
+                             <h2 className="font-game text-xl text-[#d7ccc8] tracking-widest drop-shadow-md">
+                                 BATTLE ZONE
+                             </h2>
+                         </div>
+                         <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors text-[#d7ccc8]">
+                             <X size={24} />
+                         </button>
                     </div>
 
-                    {/* Center Panel: Visualization */}
-                    <div className="col-span-6 flex flex-col relative">
+                    {/* --- BATTLEFIELD LAYOUT --- */}
+                    <div className="w-full h-full mt-16 p-8 grid grid-cols-12 gap-4">
                         
-                        {/* Dynamic Combat Phases */}
-                        <div className="flex flex-col gap-5 mb-8 mt-2 relative">
+                        {/* LEFT: PLAYER (Attacker) */}
+                        <div className="col-span-4 flex flex-col items-center justify-center relative">
+                            {/* Portrait */}
+                            <div className="w-32 h-32 md:w-48 md:h-48 border-4 border-cyan-600 shadow-[0_0_30px_rgba(8,145,178,0.4)] bg-black relative rounded group">
+                                <img src="/assets/portrait_titan.png" className="w-full h-full object-cover opacity-80" alt="Attacker" />
+                                <div className="absolute -bottom-4 inset-x-0 text-center">
+                                    <span className="bg-cyan-900 border border-cyan-500 text-cyan-200 text-xs font-bold px-3 py-1 rounded">
+                                        YOU
+                                    </span>
+                                </div>
+                            </div>
                             
-                            {/* PHASE 1: WALL */}
-                            <div className="relative group">
-                                <div className="flex justify-between text-xs font-mono text-blue-300 mb-1">
-                                    <span>PHASE 1: THE WALL</span>
-                                    <span>{wallBreached ? '0%' : '100%'} INTEGRITY</span>
+                            {/* HP / Status */}
+                            <div className="mt-8 w-full max-w-[200px]">
+                                <div className="flex justify-between text-xs font-mono text-cyan-200 mb-1">
+                                    <span>{attacker.unit}</span>
+                                    <span>{attacker.power} DPS</span>
                                 </div>
-                                <div className="h-4 w-full bg-black/50 rounded overflow-hidden border border-blue-900/30 relative">
-                                    <div className={`h-full bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all duration-[1500ms] ease-out ${wallBreached ? 'w-0' : 'w-full'}`}></div>
-                                    <div className="absolute inset-0 flex items-center justify-center text-[10px] text-white/50 font-mono">
-                                        {wallBreached ? 'BREACHED' : 'SHIELD ACTIVE'}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* PHASE 2: ARMY */}
-                            <div className="relative group">
-                                <div className="flex justify-between text-xs font-mono text-red-300 mb-1">
-                                    <span>PHASE 2: DEFENSE ARMY</span>
-                                    <span>{armyEliminated ? '0%' : '100%'} STRENGTH</span>
-                                </div>
-                                <div className="h-4 w-full bg-black/50 rounded overflow-hidden border border-red-900/30 relative">
-                                    <div className={`h-full bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.5)] transition-all duration-[2000ms] ease-out ${armyEliminated ? 'w-0' : 'w-full'}`}></div>
-                                    <div className="absolute inset-0 flex items-center justify-center text-[10px] text-white/50 font-mono">
-                                        {armyEliminated ? 'ELIMINATED' : 'STANDING GUARD'}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* PHASE 3: TOWNHALL */}
-                            <div className="relative group">
-                                <div className="flex justify-between text-xs font-mono text-yellow-300 mb-1">
-                                    <span>PHASE 3: TOWNHALL</span>
-                                    <span>{townhallSacked ? '0 HP' : '1000 HP'}</span>
-                                </div>
-                                <div className="h-4 w-full bg-black/50 rounded overflow-hidden border border-yellow-900/30 relative">
-                                    <div className={`h-full bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.5)] transition-all duration-[1500ms] ease-out ${townhallSacked ? 'w-0' : 'w-full'}`}></div>
-                                    <div className="absolute inset-0 flex items-center justify-center text-[10px] text-black/50 font-bold font-mono">
-                                        {townhallSacked ? 'SACKED' : 'SECURE'}
-                                    </div>
+                                <div className="h-3 w-full bg-black border border-cyan-800 rounded-full overflow-hidden">
+                                    <div className="h-full bg-gradient-to-r from-cyan-600 to-blue-500 w-full"></div>
                                 </div>
                             </div>
                         </div>
-    
-                        {/* Terminal Log */}
-                        <div className="flex-1 bg-black/40 border border-white/10 rounded-lg p-4 font-mono text-sm overflow-hidden relative group">
-                            <div className="absolute top-0 left-0 w-full h-6 bg-white/5 flex items-center px-2 gap-2 border-b border-white/5">
-                                <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                <span className="text-[10px] text-gray-500 ml-2">BATTLE_LOG.TXT // STREAMING</span>
-                            </div>
-                            <div className="mt-6 h-full overflow-y-auto pr-2 space-y-2 pb-4 scrollbar-thin scrollbar-thumb-cyan-900 scrollbar-track-transparent">
-                                {visibleLogs.map((log, i) => (
-                                    <div key={i} className={`
-                                        transition-all duration-300 animate-in slide-in-from-left-2
-                                        ${log.includes('VICTORY') || log.includes('SACKED') ? 'text-green-400 font-bold border-l-2 border-green-500 pl-2 bg-green-500/5' : ''}
-                                        ${log.includes('FAILED') || log.includes('LOST') ? 'text-red-400 font-bold border-l-2 border-red-500 pl-2 bg-red-500/5' : ''}
-                                        ${log.includes('PHASE') ? 'text-cyan-300 font-bold pt-2' : ''}
-                                        ${log.includes('BREACHED') || log.includes('ELIMINATED') ? 'text-yellow-400' : ''}
-                                        ${!log.includes('VICTORY') && !log.includes('FAILED') && !log.includes('PHASE') ? 'text-cyan-200/70' : ''}
-                                    `}>
-                                        <span className="mr-2 opacity-30 text-[10px] font-mono">[{new Date().toLocaleTimeString().split(' ')[0]}]</span>
-                                        {log}
-                                    </div>
-                                ))}
-                                <div ref={logEndRef} />
-                            </div>
-                        </div>
 
-                        {/* Result Overlay */}
-                        {result && visibleLogs.length === logs.length && (
-                            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-full max-w-sm bg-black/90 border border-cyan-500/50 px-8 py-6 rounded-xl backdrop-blur-xl animate-in fade-in zoom-in slide-in-from-bottom-5 text-center shadow-[0_0_50px_rgba(6,182,212,0.3)] z-20">
-                                <div className={`text-3xl font-bold mb-2 ${result.success ? 'text-green-400' : 'text-red-500'}`}>
-                                    {result.success ? 'MISSION ACCOMPLISHED' : 'MISSION FAILED'}
-                                </div>
-                                <div className="text-sm text-gray-400 font-mono mb-4">
-                                    DESTRUCTION: {result.destruction}%
-                                </div>
-                                {result.success && (
-                                    <div className="bg-green-900/20 border border-green-500/30 p-2 rounded text-green-300 font-mono text-lg">
-                                        + {result.reward} XLM
+
+                        {/* CENTER: ACTION & LOGS */}
+                        <div className="col-span-4 flex flex-col items-center justify-between py-4">
+                            
+                            {/* Visual Feedback Area */}
+                            <div className="flex-1 w-full flex flex-col items-center justify-center space-y-4">
+                                {/* Hit Splats (Simulated from logs) */}
+                                {logs.length > 0 && (
+                                    <div className="animate-in zoom-in slide-in-from-bottom-5 duration-300">
+                                         <span className="font-game text-4xl text-yellow-500 drop-shadow-[0_4px_0_rgba(0,0,0,1)] text-stroke-black">
+                                            {logs[logs.length-1].includes('BREACHED') ? 'CRITICAL HIT!' : 
+                                             logs[logs.length-1].includes('FAILED') ? 'BLOCKED!' :
+                                             logs[logs.length-1].includes('VICTORY') ? 'VICTORY!' : 'ATTACKING...'}
+                                         </span>
                                     </div>
                                 )}
                             </div>
-                        )}
 
-                        {/* Action Buttons */}
-                        {!result && !isRaiding && (
-                            <div className="absolute bottom-6 left-6 flex gap-4">
+                            {/* RAID BUTTONS (Bottom Center) */}
+                             {!result && !isRaiding && (
                                 <button 
                                     onClick={onLaunch}
-                                    className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-3 px-8 rounded clip-path-polygon hover:shadow-[0_0_20px_rgba(6,182,212,0.5)] transition-all uppercase tracking-wider flex items-center gap-2"
+                                    className="relative group bg-gradient-to-b from-red-600 to-red-900 border-4 border-red-950 rounded-xl px-8 py-4 shadow-xl active:scale-95 transition-all"
                                 >
-                                    <Zap size={18} fill="black" /> STAKE 100 XLM & RAID
+                                    <span className="font-game text-white text-xl tracking-widest drop-shadow-md flex items-center gap-2">
+                                        <Sword size={24} /> RAID (100 XLM)
+                                    </span>
                                 </button>
-                                <button 
-                                    onClick={onClose}
-                                    className="bg-transparent border border-red-500/50 text-red-500 hover:bg-red-500/10 font-bold py-3 px-8 rounded uppercase tracking-wider transition-all"
-                                >
-                                    Abort
-                                </button>
-                            </div>
-                        )}
-                        
-                        {isRaiding && (
-                             <div className="absolute bottom-6 left-6 flex gap-4">
-                                <button disabled className="bg-slate-800 text-slate-400 font-bold py-3 px-8 rounded cursor-not-allowed uppercase tracking-wider flex items-center gap-2 border border-slate-700">
-                                    <Activity size={16} className="animate-spin text-cyan-500" /> BATTLE IN PROGRESS...
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Right Panel: Target Intel */}
-                    <div className="col-span-3 border-t md:border-t-0 md:border-l border-white/5 pt-6 md:pt-0 md:pl-6 flex flex-col gap-6">
-                        <div className="bg-[#0a1120] border border-red-500/20 rounded-lg p-4">
-                            <h3 className="text-red-400 text-xs font-mono uppercase border-b border-red-500/20 pb-2 mb-3">Target Intel</h3>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-gray-500">DEFENSE</span>
-                                    <span className="text-red-300 font-mono text-lg">{defender.defense}</span>
+                             )}
+                             
+                             {/* Result Banner */}
+                             {result && (
+                                <div className="bg-black/80 border-2 border-yellow-500/50 p-6 rounded-xl text-center backdrop-blur-md animate-in zoom-in">
+                                    <h3 className={`font-game text-3xl mb-2 ${result.success ? 'text-green-400' : 'text-red-500'}`}>
+                                        {result.success ? 'RAID SUCCESSFUL' : 'RAID FAILED'}
+                                    </h3>
+                                    {result.success && <div className="text-yellow-400 font-mono text-xl">+ {result.reward} XLM</div>}
                                 </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-gray-500">UNIT TYPE</span>
-                                    <span className="text-white font-mono">{defender.unit}</span>
+                             )}
+
+                        </div>
+
+
+                        {/* RIGHT: ENEMY (Defender) */}
+                        <div className="col-span-4 flex flex-col items-center justify-center relative">
+                             {/* Portrait */}
+                             <div className={`w-32 h-32 md:w-48 md:h-48 border-4 border-red-600 shadow-[0_0_30px_rgba(220,38,38,0.4)] bg-black relative rounded transition-transform ${defenderShake ? 'animate-shake' : ''}`}>
+                                <Castle size={64} className="absolute inset-0 m-auto text-red-800 opacity-50" /> 
+                                {/* Placeholder for Castle Image */}
+                                <div className="w-full h-full bg-red-900/10 flex items-center justify-center">
+                                     <span className="font-game text-red-500 text-4xl opacity-50">VS</span>
+                                </div>
+
+                                <div className="absolute -bottom-4 inset-x-0 text-center">
+                                    <span className="bg-red-900 border border-red-500 text-red-200 text-xs font-bold px-3 py-1 rounded">
+                                        {defender.name}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            {/* HP / Status */}
+                            <div className="mt-8 w-full max-w-[200px] space-y-2">
+                                <div className="flex justify-between text-xs font-mono text-red-200 mb-1">
+                                    <span>WALL INTEGRITY</span>
+                                    <span>{defender.defense} HP</span>
+                                </div>
+                                {/* Gold Frame HP Bar */}
+                                <div className="h-4 w-full bg-[#1a0f0a] border-2 border-[#fbbf24] rounded-sm overflow-hidden relative">
+                                    <div className={`h-full bg-gradient-to-b from-green-500 to-green-700 transition-all duration-500 ease-out`}
+                                         style={{ width: `${Math.max(0, 100 - (logs.length * 10))}%` }}></div> 
+                                         {/* Simulated Damage based on log progress since we don't have exact HP scaling in props yet */}
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-hidden flex flex-col">
-                            <h3 className="text-gray-500 text-xs font-mono uppercase mb-3 flex items-center gap-2">
-                                <Trophy size={12} className="text-yellow-500" /> Top Commanders
-                            </h3>
-                            <div className="space-y-1 flex-1 overflow-y-auto pr-1">
-                                {topCommanders.map((p, i) => (
-                                    <div key={i} className="flex justify-between items-center bg-white/5 p-2 rounded hover:bg-white/10 cursor-pointer">
-                                        <span className={`text-xs ${i===0 ? 'text-yellow-400' : 'text-gray-300'}`}>{p.username || 'Unknown'}</span>
-                                        <span className="text-xs font-mono text-cyan-500">{p.stats?.wins || 0}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
                     </div>
                 </div>
+
             </div>
+
+             {/* Hidden Audio */}
+             {/* Note to User: Please ensure '26. Combat Music.mp3' is renamed to 'combat_music.mp3' and placed in public/assets/ */}
+             {/* We create the audio object in useEffect, but we can also place a fallback element here just in case */}
         </div>
     );
 };
