@@ -11,9 +11,10 @@ interface BattleArenaProps {
     walletAddress: string | null;
     user: any;
     xlmBalance: string;
+    troops: any;
 }
 
-export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBalance }: BattleArenaProps) {
+export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBalance, troops }: BattleArenaProps) {
     const [opponents, setOpponents] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
@@ -22,6 +23,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
     const [logs, setLogs] = useState<string[]>([]);
     const [battleResult, setBattleResult] = useState<any>(null);
     const [cooldown, setCooldown] = useState(0);
+    const currentDps = ((troops?.archers||0)*3) + ((troops?.infantry||0)*5) + ((troops?.giants||0)*7);
 
     useEffect(() => {
         fetchOpponents();
@@ -95,7 +97,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
             return;
         }
         
-        const dps = ((user?.troops?.archers||0)*3) + ((user?.troops?.infantry||0)*5) + ((user?.troops?.giants||0)*7);
+        const dps = currentDps;
         const def = selectedOpponent.stats?.defense || 50;
         
         if (dps === 0) {
@@ -197,7 +199,7 @@ export function BattleArena({ refreshGame, onToast, walletAddress, user, xlmBala
                     onClose={() => setModalOpen(false)}
                     onLaunch={handleLaunch}
                     isRaiding={raiding}
-                    attacker={{ name: user?.username || 'YOU', power: 100, unit: 'V3_ARMY' }}
+                    attacker={{ name: user?.username || 'YOU', power: currentDps, unit: 'V3_ARMY' }}
                     defender={{ 
                         name: selectedOpponent.username, 
                         defense: selectedOpponent.stats?.defense || 50, 
