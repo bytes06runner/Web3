@@ -27,7 +27,7 @@ export const UpgradeShieldButton: React.FC<Props> = ({ walletAddress, onUpgrade,
     };
 
     return (
-        <div className="w-full flex justify-center py-6">
+        <div className="w-full flex justify-center py-8"> {/* Added padding to container for label space */}
             <button 
                 onClick={handleUpgrade}
                 className="relative w-full max-w-2xl h-24 group transition-transform active:scale-95"
@@ -39,9 +39,9 @@ export const UpgradeShieldButton: React.FC<Props> = ({ walletAddress, onUpgrade,
                     className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] group-hover:brightness-110"
                 />
                 
-                {/* Cost Label - FORCE BOTTOM */}
-                <div className="absolute inset-x-0 bottom-0 flex justify-center translate-y-1/2">
-                     <span className="font-game text-amber-400 text-[10px] md:text-xs tracking-widest bg-black/90 px-4 py-1 rounded-full border border-amber-500/30 shadow-lg backdrop-blur-sm z-10">
+                {/* Cost Label - Pushed OUTSIDE the image area visually */}
+                <div className="absolute inset-x-0 -bottom-4 flex justify-center z-20">
+                     <span className="font-game text-amber-500 text-xs tracking-widest bg-black px-6 py-1 rounded border-2 border-amber-600/50 shadow-xl">
                         COST: 10 XLM
                      </span>
                 </div>

@@ -18,28 +18,28 @@ export function Leaderboard() {
     }, []);
 
     return (
-        <div className="h-[450px] flex flex-col items-center justify-center relative">
+        <div className="relative w-full aspect-[4/5] max-h-[500px] flex flex-col items-center justify-center p-[15%]">
             {/* Gold Frame Background */}
             <div className="gold-frame absolute inset-0 z-0 pointer-events-none drop-shadow-2xl"></div>
 
-            {/* Dark Backdrop for Readability */}
-            <div className="absolute inset-x-12 inset-y-16 bg-[#1a1a1a]/80 backdrop-blur-sm z-0 rounded-lg"></div>
+            {/* Dark Backdrop for Readability - Inset optimized for the frame asset */}
+            <div className="absolute inset-[15%] bg-[#121212]/90 backdrop-blur-sm z-0 rounded-xl border border-yellow-900/30"></div>
 
-            <div className="relative z-10 w-full h-full p-16 flex flex-col items-center text-center pt-24 pb-20">
-                <div className="flex items-center gap-2 mb-6 bg-black/80 px-6 py-1.5 rounded-full border border-yellow-500/50 shadow-lg">
-                     <Crown size={20} className="text-yellow-400" />
-                     <h3 className="font-game text-yellow-100 uppercase tracking-widest text-lg">Leaderboard</h3>
+            <div className="relative z-10 w-full h-full flex flex-col items-center text-center">
+                <div className="flex items-center gap-2 mb-4 bg-black/80 px-4 py-1 rounded-full border border-yellow-500/50 shadow-lg mt-2">
+                     <Crown size={16} className="text-yellow-400" />
+                     <h3 className="font-game text-yellow-100 uppercase tracking-widest text-sm md:text-base">Leaderboard</h3>
                 </div>
 
-                <div className="w-full space-y-3 overflow-hidden">
+                <div className="w-full space-y-2 overflow-hidden flex-1 relative">
                     {leaders.map((l, i) => (
-                        <div key={i} className="flex justify-between items-center text-sm px-4 py-2.5 bg-black/40 rounded border border-yellow-500/10 hover:bg-black/60 transition-colors">
-                            <div className="flex items-center gap-3">
-                                <span className={`font-bold font-mono text-lg ${i===0?'text-yellow-400 drop-shadow-md':i===1?'text-slate-300':'text-amber-600'}`}>#{i+1}</span>
-                                <span className="text-gray-200 font-bold tracking-wide">{l.username}</span>
+                        <div key={i} className="flex justify-between items-center text-xs md:text-sm px-3 py-2 bg-white/5 rounded border border-white/5 hover:bg-white/10 transition-colors">
+                            <div className="flex items-center gap-2">
+                                <span className={`font-bold font-mono ${i===0?'text-yellow-400':i===1?'text-slate-300':'text-amber-700'}`}>#{i+1}</span>
+                                <span className="text-gray-200 font-bold tracking-wide truncate max-w-[100px]">{l.username}</span>
                             </div>
-                            <div className="flex items-center gap-1.5 bg-yellow-900/20 px-2 py-0.5 rounded text-yellow-500">
-                                <Trophy size={12} />
+                            <div className="flex items-center gap-1 text-yellow-500/80">
+                                <Trophy size={10} />
                                 <span className="font-mono font-bold">{l.stats?.wins || 0}</span>
                             </div>
                         </div>
